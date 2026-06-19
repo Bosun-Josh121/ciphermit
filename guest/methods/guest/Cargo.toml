@@ -1,0 +1,27 @@
+[package]
+name = "ciphermit-guest"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[[bin]]
+name = "allowance"
+path = "src/bin/allowance.rs"
+
+[[bin]]
+name = "delegation"
+path = "src/bin/delegation.rs"
+
+[[bin]]
+name = "compliance"
+path = "src/bin/compliance.rs"
+
+[[bin]]
+name = "allowlist"
+path = "src/bin/allowlist.rs"
+
+[dependencies]
+risc0-zkvm = { version = "^3.0", default-features = false, features = ["std"] }
+sha2 = "0.10"
+serde = { version = "1.0", features = ["derive"] }

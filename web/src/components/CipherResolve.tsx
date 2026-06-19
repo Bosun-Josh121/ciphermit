@@ -30,7 +30,6 @@ const STAGE_LABELS: Record<ProofStage, string> = {
 export function CipherResolve({ stage, txHash, explorerUrl }: Props) {
   const prefersReduced = useReducedMotion()
   const [display, setDisplay] = useState('')
-  const [resolvedChars, setResolvedChars] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const target = stage === 'authorized' ? '✓ AUTHORIZED' : stage === 'failed' ? '✗ REJECTED' : ''
@@ -49,7 +48,7 @@ export function CipherResolve({ stage, txHash, explorerUrl }: Props) {
     }
 
     clearScrambel()
-    setResolvedChars(0)
+
 
     if (!isActive && !isResolved) {
       setDisplay('')
@@ -69,7 +68,6 @@ export function CipherResolve({ stage, txHash, explorerUrl }: Props) {
       let resolved = 0
       intervalRef.current = setInterval(() => {
         resolved++
-        setResolvedChars(resolved)
         if (resolved >= target.length) {
           clearScrambel()
           setDisplay(target)
@@ -111,7 +109,7 @@ export function CipherResolve({ stage, txHash, explorerUrl }: Props) {
       {/* Step indicators */}
       <div className="flex gap-3 items-center">
         {(['building', 'verifying', 'authorized'] as ProofStage[]).map((s) => {
-          const done = stage === 'authorized' || (s === 'building' && (stage === 'verifying' || stage === 'authorized'))
+          const done = stage === 'authorized' || (s === 'building' && stage === 'verifying')
           const active = stage === s
           return (
             <div key={s} className="flex items-center gap-2">

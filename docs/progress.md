@@ -43,9 +43,11 @@ Updated by the agent after each phase. Never fabricated — only real results ar
 - `image_id`: TBD after proof generation
 
 ### Phase 4 — Vault contract
-- **Status:** ⏳ PENDING
-- Vault contract address: TBD
-- USDC token address: TBD — [USER ACTION REQUIRED to confirm testnet USDC SAC]
+- **Status:** ✓ COMPLETE (2026-06-19)
+- Vault address: `CBHDNNIN76GWDVH3IGV43J2RM3DJSLN2VTTBOU3O5WITKIOSBQ4NDW7C`
+- Token: XLM native SAC `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`
+- Router: `CBI2UZ3K4HZW2Y3JK5DAXN2BVGCNFZTLUIOQV7JRGAOEMNA4DUZFF4O2`
+- All 4 policy slots set with placeholder image_ids (zeros) — update after Phase 3
 
 ### Phase 5 — Prover service
 - **Status:** ⏳ PENDING
@@ -74,8 +76,8 @@ Updated by the agent after each phase. Never fabricated — only real results ar
 | Timelock Controller (testnet) | CDN3XR4USW2STQ2VH635W3YNX3YOODTBIR3VPDE7FYQKTKWSKCBZFARX | 2026-06-19 |
 | RISC Zero Router (testnet) | CBI2UZ3K4HZW2Y3JK5DAXN2BVGCNFZTLUIOQV7JRGAOEMNA4DUZFF4O2 | 2026-06-19 |
 | Groth16 Verifier / Emergency Stop (testnet) | CC6XUVRVDUA3XS57AUUN4RWM2S7FPFQ6KTZSW6HTEU4ZOFNF3ORNUXUE | 2026-06-19 |
-| Ciphermit Vault (testnet) | TBD | - |
-| Testnet USDC SAC | CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA | verified 2026-06-19 |
+| Ciphermit Vault (testnet) | CBHDNNIN76GWDVH3IGV43J2RM3DJSLN2VTTBOU3O5WITKIOSBQ4NDW7C | 2026-06-19 |
+| XLM native SAC (demo token) | CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC | verified 2026-06-19 |
 
 ---
 

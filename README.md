@@ -1,74 +1,136 @@
 # Ciphermit
 
-> Private, programmable spending authority for shared and delegated money on Stellar.
+> Multi-policy spending vault on Stellar, enforced by RISC Zero zero-knowledge proofs.
 
-Ciphermit is a **multi-policy spending vault** on Stellar. You deposit USDC into a vault. The vault releases funds **only when shown a zero-knowledge proof** that the spend satisfies a policy — and the policy, the amounts, and the spending history stay private. The public chain sees only "an authorized spend happened."
+Ciphermit lets you lock funds in an on-chain vault with private spending rules. Every spend generates a ZK proof. The Stellar network sees only "authorized" — your caps, limits, delegates, and allowlists stay hidden.
+
+---
 
 ## Policies
 
-| Policy | What it proves |
-|---|---|
-| **Allowance** | Spend is within a hidden per-period cap that auto-refreshes |
-| **Delegation** | Authorized delegate spending within a hidden sub-cap |
-| **Compliance** | Spend satisfies sanctions non-membership + threshold rules |
-| **Allowlist** | Recipient is in an approved set (without revealing the set) |
+| Policy | What stays private |
+|--------|-------------------|
+| **Allowance** | Per-period cap and cumulative spend history |
+| **Delegation** | Delegate identity and their sub-cap |
+| **Compliance** | Sanctions check without revealing the list or threshold |
+| **Allowlist** | Set of approved recipients without revealing the set |
 
-Plus **selective-disclosure audit**: a view-key holder can reconstruct any single transaction. Private by default, auditable on authority.
+---
 
 ## Architecture
 
 ```
-   OFF-CHAIN                              ON-CHAIN (Soroban, Stellar testnet)
-─────────────────  seal,              ──────────────────────────────────────
-  Prover Service   image_id,            Ciphermit Vault Contract
-  (Rust)         ──journal_digest──►    (Policy + Application)
-                                        - holds USDC escrow
-  runs the guest                        - stores policy commitments
-─────────────────                       - anti-replay nullifiers
-        │                               - calls router.verify()
-─────────▼──────────                    - releases USDC on pass
-  RISC Zero                             - CAP-0078 TTL state
-  Guest Programs              ──────────────────────────────────────
-  (Rust)                                        │ verify()
-  - allowance                  ─────────────────▼──────────────────
-  - delegation                   Nethermind RISC Zero Verifier
-  - compliance                   Router  (deployed testnet)
-  - allowlist              ──────────────────────────────────────
-─────────────────
+Browser (React + Tailwind v4)
+  │  sign with Freighter / xBull
+  ▼
+Ciphermit Vault (Soroban)          ← verifies proof before releasing funds
+  │  verify(seal, image_id, journal_digest)
+  ▼
+RISC Zero Router (Soroban)         ← Nethermind verifier stack
+  ▼
+Groth16 Verifier (Soroban)         ← on-chain pairing check
+
+            ↑ proof built off-chain by:
+
+Prover Service (Axum + risc0-zkvm) ← runs locally; holds no keys
+  ▼
+RISC Zero Guest Programs (RISC-V)  ← allowance / delegation / compliance / allowlist
 ```
 
-## Quick Start
+### Proof format
 
-> Full setup requires RISC Zero toolchain and Docker (x86_64 for proof generation). See [docs/architecture.md](docs/architecture.md) for the full build guide.
+Every proof produces a 128-byte public journal bound to the exact transaction:
 
-```bash
-# Build contracts
-stellar contract build
-
-# Run contract tests
-cargo test
-
-# Start prover service
-cd prover && cargo run
-
-# Start frontend
-cd web && npm install && npm run dev
+```
+[0 –31]  policy_commitment     sha256(period_cap_le || period_id_le || vault_secret)
+[32–63]  new_spent_commitment  sha256(new_spent_le || period_id_le || blinding)
+[64–95]  nullifier             sha256(nullifier_secret || action_context)
+[96–127] action_context        sha256(sha256(owner) || sha256(to) || amount_u64_le)
 ```
 
-## Deployed Contracts (Testnet)
+The vault recomputes `action_context` from its call arguments and asserts it matches the journal — binding the proof to the exact owner, recipient, and amount.
+
+---
+
+## Deployed contracts (Stellar testnet)
 
 | Contract | Address |
-|---|---|
-| RISC Zero Router | _(see docs/progress.md)_ |
-| Ciphermit Vault | _(see docs/progress.md)_ |
+|----------|---------|
+| RISC Zero Timelock | `CDN3XR4USW2STQ2VH635W3YNX3YOODTBIR3VPDE7FYQKTKWSKCBZFARX` |
+| RISC Zero Router | `CBI2UZ3K4HZW2Y3JK5DAXN2BVGCNFZTLUIOQV7JRGAOEMNA4DUZFF4O2` |
+| Groth16 Verifier | `CC6XUVRVDUA3XS57AUUN4RWM2S7FPFQ6KTZSW6HTEU4ZOFNF3ORNUXUE` |
+| Emergency Stop | `CBYTHZE3GMCLSYNO27RSMFB5IGESEGUVWDYA3PY3WPCPXLX35BRDIXGH` |
+| Ciphermit Vault | `CBHDNNIN76GWDVH3IGV43J2RM3DJSLN2VTTBOU3O5WITKIOSBQ4NDW7C` |
 
-## Security Notes
+Verifier selector `73c457ba` · RISC Zero `3.0.0` · soroban-sdk `25.1.0`
 
-- Anti-replay enforced via nullifiers + action_context binding on every spend
-- `image_id` is stored at deploy time — never caller-supplied
-- Policy parameters become hidden commitments; the chain never sees cap values or histories
-- Prover service is availability-trusted but not custody-trusted (holds no keys or funds)
-- This is a hackathon prototype; not audited — do not use with real assets
+---
+
+## Repository layout
+
+```
+contracts/vault/    Soroban vault contract (wasm32)
+guest/
+  methods/          RISC Zero guest programs — 4 policy ELFs (riscv32im)
+  host/             Prover HTTP service (Axum)
+verifier/           Nethermind RISC Zero verifier stack + deployment.toml
+web/                React frontend (Vite + Tailwind v4 + framer-motion)
+scripts/            deploy-vault.sh  set-image-ids.sh  e2e.sh
+docs/               architecture.md  brand.md  progress.md
+```
+
+---
+
+## Running locally
+
+**Prerequisites:** Rust stable, `stellar` CLI, Node 18+, Docker (x86_64 for Groth16).
+
+### Prover service
+
+```bash
+# Install RISC Zero toolchain (one-time)
+curl -L https://risczero.com/install | bash
+rzup install
+rzup install risc0-groth16
+
+cd guest
+cargo build --release   # compiles guest ELFs; image_ids printed to stdout
+
+cd host
+RUST_LOG=info cargo run --release
+# → http://localhost:3001
+```
+
+### Frontend
+
+```bash
+cd web
+cp .env.example .env
+# set VITE_VAULT_CONTRACT_ID after deploying
+npm install && npm run dev
+```
+
+### Deploy vault (one-time)
+
+```bash
+stellar contract build --package ciphermit-vault
+./scripts/deploy-vault.sh
+# then after image_ids are known:
+./scripts/set-image-ids.sh <VAULT_ID> <ALLOWANCE_IMAGE_ID>
+```
+
+---
+
+## Security properties
+
+- **Policy privacy** — caps and rule parameters are committed via sha256; never stored in plaintext.
+- **Anti-replay** — nullifiers are stored in persistent Soroban storage; each can be consumed once.
+- **Binding** — `action_context` ties each proof to a specific owner, recipient, and amount.
+- **Tamper-proof** — Groth16 pairing check happens on-chain; a forged proof cannot pass.
+- **Non-custodial** — the prover service generates proofs but never holds keys or funds.
+- **Hackathon prototype** — not audited; do not use with real assets.
+
+---
 
 ## License
 

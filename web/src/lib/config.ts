@@ -1,7 +1,9 @@
 export const NETWORK = import.meta.env.VITE_NETWORK ?? 'testnet'
 export const VAULT_CONTRACT_ID = import.meta.env.VITE_VAULT_CONTRACT_ID ?? ''
 export const PROVER_URL = import.meta.env.VITE_PROVER_URL ?? 'http://localhost:3001'
-export const USDC_CONTRACT_ID = import.meta.env.VITE_USDC_CONTRACT_ID ?? ''
+export const TOKEN_CONTRACT_ID =
+  import.meta.env.VITE_TOKEN_CONTRACT_ID ??
+  'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC'
 
 export const HORIZON_URL =
   NETWORK === 'mainnet'

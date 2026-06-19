@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, SectionLabel } from '../components/Card'
+import { getVaultBalance, getVaultCount } from '../lib/stellar'
 import type { VaultInfo } from '../types/vault'
 
 interface Props {
@@ -9,7 +11,36 @@ interface Props {
   onSelectVault: (v: VaultInfo) => void
 }
 
-export function Dashboard({ vaults, publicKey, onOpenVault, onSelectVault }: Props) {
+export function Dashboard({ vaults: propVaults, publicKey, onOpenVault, onSelectVault }: Props) {
+  const [vaults, setVaults] = useState<VaultInfo[]>(propVaults)
+  const [loadingChain, setLoadingChain] = useState(false)
+
+  // Try to refresh vault balances from chain when vaults change
+  useEffect(() => {
+    setVaults(propVaults)
+    if (propVaults.length > 0) {
+      setLoadingChain(true)
+      Promise.all(
+        propVaults.map(async v => {
+          try {
+            const balance = await getVaultBalance(v.id)
+            return { ...v, balance }
+          } catch { return v }
+        })
+      ).then(updated => {
+        setVaults(updated)
+        setLoadingChain(false)
+      })
+    }
+  }, [propVaults])
+
+  // Also try to discover vaults opened in previous sessions via vault_count
+  useEffect(() => {
+    if (propVaults.length === 0) {
+      getVaultCount().catch(() => 0)
+    }
+  }, [propVaults.length])
+
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between">
@@ -25,6 +56,10 @@ export function Dashboard({ vaults, publicKey, onOpenVault, onSelectVault }: Pro
           Open vault
         </button>
       </div>
+
+      {loadingChain && (
+        <p className="mono text-xs text-mute">Refreshing balances from chain…</p>
+      )}
 
       {vaults.length === 0 ? (
         <motion.div
@@ -45,8 +80,10 @@ export function Dashboard({ vaults, publicKey, onOpenVault, onSelectVault }: Pro
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
             >
-              <Card className="cursor-pointer hover:border-line/80 transition-colors"
-                    onClick={() => onSelectVault(v)}>
+              <Card
+                className="cursor-pointer hover:border-line/80 transition-colors"
+                onClick={() => onSelectVault(v)}
+              >
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
@@ -61,7 +98,7 @@ export function Dashboard({ vaults, publicKey, onOpenVault, onSelectVault }: Pro
                     <p className="mono text-sm text-ink">
                       {(Number(v.balance) / 1e7).toFixed(2)}
                     </p>
-                    <p className="mono text-xs text-mute">USDC</p>
+                    <p className="mono text-xs text-mute">XLM</p>
                   </div>
                 </div>
               </Card>

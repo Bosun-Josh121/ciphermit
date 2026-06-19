@@ -1,0 +1,53 @@
+@import '@fontsource/space-grotesk/400.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/geist-mono/400.css';
+@import '@fontsource/geist-mono/500.css';
+
+@import "tailwindcss";
+
+:root {
+  --void:   #0A0B0F;
+  --panel:  #14161D;
+  --line:   #232733;
+  --mute:   #6B7280;
+  --ink:    #E8EAF0;
+  --seal:   #B8FF4F;
+  --breach: #FF5C5C;
+}
+
+@theme inline {
+  --color-void:   var(--void);
+  --color-panel:  var(--panel);
+  --color-line:   var(--line);
+  --color-mute:   var(--mute);
+  --color-ink:    var(--ink);
+  --color-seal:   var(--seal);
+  --color-breach: var(--breach);
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body:    'Inter', sans-serif;
+  --font-mono:    'Geist Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+
+body {
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  min-height: 100dvh;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-attachment: fixed;
+}
+
+.mono { font-family: 'Geist Mono', monospace; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--void); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }

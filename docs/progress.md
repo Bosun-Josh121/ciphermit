@@ -30,9 +30,13 @@ Updated by the agent after each phase. Never fabricated — only real results ar
 - `.gitignore` correct; `.local/` not tracked
 
 ### Phase 2 — Verifier deployment
-- **Status:** ⏳ PENDING — awaiting rzup install + user confirmation
-- Nethermind verifier testnet router address: **NOT DEPLOYED** (deployment.toml shows empty string)
-- Will deploy own router + verifier + emergency-stop chain
+- **Status:** ✓ COMPLETE (2026-06-19)
+- Deployed own full RISC Zero verifier stack to Stellar testnet
+- Timelock (delay=0): `CDN3XR4USW2STQ2VH635W3YNX3YOODTBIR3VPDE7FYQKTKWSKCBZFARX`
+- Router: `CBI2UZ3K4HZW2Y3JK5DAXN2BVGCNFZTLUIOQV7JRGAOEMNA4DUZFF4O2`
+- Groth16 Verifier: `CC6XUVRVDUA3XS57AUUN4RWM2S7FPFQ6KTZSW6HTEU4ZOFNF3ORNUXUE`
+- Emergency Stop: `CBYTHZE3GMCLSYNO27RSMFB5IGESEGUVWDYA3PY3WPCPXLX35BRDIXGH`
+- Verifier selector `73c457ba` registered with router (`unroutable=false` ✓)
 
 ### Phase 3 — Allowance guest program
 - **Status:** ⏳ PENDING — awaiting RISC Zero toolchain
@@ -67,10 +71,11 @@ Updated by the agent after each phase. Never fabricated — only real results ar
 
 | Contract | Address | Deployed |
 |---|---|---|
-| RISC Zero Router (testnet) | TBD | - |
-| Groth16 Verifier (testnet) | TBD | - |
+| Timelock Controller (testnet) | CDN3XR4USW2STQ2VH635W3YNX3YOODTBIR3VPDE7FYQKTKWSKCBZFARX | 2026-06-19 |
+| RISC Zero Router (testnet) | CBI2UZ3K4HZW2Y3JK5DAXN2BVGCNFZTLUIOQV7JRGAOEMNA4DUZFF4O2 | 2026-06-19 |
+| Groth16 Verifier / Emergency Stop (testnet) | CC6XUVRVDUA3XS57AUUN4RWM2S7FPFQ6KTZSW6HTEU4ZOFNF3ORNUXUE | 2026-06-19 |
 | Ciphermit Vault (testnet) | TBD | - |
-| Testnet USDC SAC | TBD — [VERIFY LIVE] | - |
+| Testnet USDC SAC | CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA | verified 2026-06-19 |
 
 ---
 

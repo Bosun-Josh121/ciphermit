@@ -88,17 +88,24 @@ docs/               architecture.md  brand.md  progress.md
 ### Prover service
 
 ```bash
-# Install RISC Zero toolchain (one-time)
+# Install RISC Zero toolchain (one-time, x86_64 + Docker required for Groth16)
 curl -L https://risczero.com/install | bash
 rzup install
-rzup install risc0-groth16
+rzup install rust           # RISC-V cross-compilation toolchain
+rzup install risc0-groth16  # Groth16 proving backend
 
 cd guest
-cargo build --release   # compiles guest ELFs; image_ids printed to stdout
+cargo build --release   # compiles 4 guest ELFs, then the prover binary
 
 cd host
 RUST_LOG=info cargo run --release
-# → http://localhost:3001
+# → http://localhost:3001/health
+
+# After build, extract image_ids and register them:
+cd ..  # back to project root
+./scripts/extract-image-ids.sh          # prints ALLOWANCE_ID=... etc.
+# add the IDs to .local/addresses.md then:
+./scripts/set-image-ids.sh <VAULT_ID>
 ```
 
 ### Frontend
@@ -115,8 +122,18 @@ npm install && npm run dev
 ```bash
 stellar contract build --package ciphermit-vault
 ./scripts/deploy-vault.sh
-# then after image_ids are known:
-./scripts/set-image-ids.sh <VAULT_ID> <ALLOWANCE_IMAGE_ID>
+# then after image_ids are extracted:
+./scripts/extract-image-ids.sh          # outputs ALLOWANCE_ID=<hex> etc.
+./scripts/set-image-ids.sh <VAULT_ID>   # sets all 4 policies
+```
+
+### End-to-end spine test
+
+```bash
+# With the prover running on :3001:
+./scripts/e2e-demo.sh [RECIPIENT_ADDRESS]
+# Opens a vault, deposits 1 XLM, generates a real Groth16 proof,
+# executes the spend, and verifies replay is rejected.
 ```
 
 ---

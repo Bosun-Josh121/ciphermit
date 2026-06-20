@@ -7,9 +7,10 @@ set -euo pipefail
 PORT=${1:-3001}
 
 echo "=== Checking prerequisites ==="
+export PATH="$PATH:$HOME/.risc0/bin:$HOME/.cargo/bin"
 command -v rzup >/dev/null || { echo "ERROR: rzup not found. Run: curl -L https://risczero.com/install | bash && source ~/.bashrc"; exit 1; }
-export PATH="$PATH:$HOME/.risc0/bin"
-rzup show | grep -q risc0-groth16 || { echo "ERROR: risc0-groth16 not installed. Run: rzup install risc0-groth16"; exit 1; }
+rzup show 2>/dev/null | grep -q "risc0-groth16" || { echo "ERROR: risc0-groth16 not installed. Run: rzup install risc0-groth16"; exit 1; }
+rzup show 2>/dev/null | grep -q "rust" || { echo "ERROR: RISC Zero Rust toolchain not installed. Run: rzup install rust"; exit 1; }
 command -v docker >/dev/null && docker info >/dev/null 2>&1 || { echo "WARNING: Docker not running — Groth16 proofs will fail"; }
 
 echo "=== Building prover service ==="

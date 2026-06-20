@@ -105,10 +105,19 @@ export interface SpendParams {
   actionContextHex: string
 }
 
+// Map frontend policy type names to vault contract Symbol names (≤9 chars for symbol_short!)
+const POLICY_SYM: Record<string, string> = {
+  allowance: 'allowance',
+  delegation: 'delegat',
+  compliance: 'comply',
+  allowlist: 'allowlist',
+}
+
 export function buildOpenVaultTx(p: OpenVaultParams): Promise<string> {
+  const sym = POLICY_SYM[p.policyType] ?? p.policyType
   return buildTx(p.owner, vault, 'open_vault', [
     addrVal(p.owner),
-    symVal(p.policyType),
+    symVal(sym),
     bytesVal(p.policyCommitmentHex),
     bytesVal(p.initialSpentCommitmentHex),
     u64Val(p.periodId),

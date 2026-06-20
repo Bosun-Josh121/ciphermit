@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Card, SectionLabel } from '../components/Card'
-import { buildOpenVaultTx, buildTokenApproveTx, buildDepositTx, submitSigned } from '../lib/stellar'
+import { buildOpenVaultTx, buildTokenApproveTx, buildDepositTx, submitSigned, getVaultCount } from '../lib/stellar'
 import { signTransaction } from '../lib/wallet'
 import { randomHex32 } from '../lib/prover'
 import type { PolicyType, VaultInfo } from '../types/vault'
@@ -19,23 +19,24 @@ const POLICIES: { type: PolicyType; label: string; desc: string }[] = [
   { type: 'allowlist', label: 'Allowlist', desc: 'Restrict spending to an approved set of recipients.' },
 ]
 
-// phase 3+: replace with image_id-aware commitment. For now: sha256(secret || periodCap || periodId)
+// Must match guest allowance.rs: sha256(period_cap_u64_le || period_id_u64_le || vault_secret)
 async function deriveAllowanceCommitment(vaultSecret: string, periodCapStroops: bigint, periodId: bigint): Promise<string> {
   const buf = new Uint8Array(48)
-  const secretBytes = Buffer.from(vaultSecret, 'hex')
-  buf.set(secretBytes, 0)
   const view = new DataView(buf.buffer)
-  view.setBigUint64(32, periodCapStroops, true)
-  view.setBigUint64(40, periodId, true)
+  view.setBigUint64(0, periodCapStroops, true)   // bytes 0-7:  period_cap LE
+  view.setBigUint64(8, periodId, true)            // bytes 8-15: period_id LE
+  buf.set(Buffer.from(vaultSecret, 'hex'), 16)    // bytes 16-47: vault_secret (32 bytes)
   return sha256(buf)
 }
 
-async function deriveSpentCommitment(blinding: string, periodId: bigint): Promise<string> {
-  const buf = new Uint8Array(16)
-  const blindBytes = Buffer.from(blinding, 'hex').slice(0, 8)
-  buf.set(blindBytes, 0)
+// Must match guest allowance.rs: sha256(0_u64_le || period_id_u64_le || blinding)
+// (initial spent = 0, so new_spent = 0 for the first spend)
+async function deriveInitialSpentCommitment(blinding: string, periodId: bigint): Promise<string> {
+  const buf = new Uint8Array(48)
   const view = new DataView(buf.buffer)
-  view.setBigUint64(8, periodId, true)
+  view.setBigUint64(0, 0n, true)      // bytes 0-7:  new_spent = 0 LE
+  view.setBigUint64(8, periodId, true) // bytes 8-15: period_id LE
+  buf.set(Buffer.from(blinding, 'hex'), 16)  // bytes 16-47: blinding (32 bytes)
   return sha256(buf)
 }
 
@@ -64,7 +65,10 @@ export function OpenVault({ onBack, onCreated, publicKey }: Props) {
       const vaultSecret = randomHex32()
       const blinding = randomHex32()
       const policyCommitment = await deriveAllowanceCommitment(vaultSecret, periodCapStroops, periodId)
-      const spentCommitment = await deriveSpentCommitment(blinding, periodId)
+      const spentCommitment = await deriveInitialSpentCommitment(blinding, periodId)
+
+      // Read current vault_count before opening — the new vault_id will equal this value
+      const vaultId = await getVaultCount()
 
       // 1. Approve token spend
       setStatus('Approving token…')
@@ -83,11 +87,6 @@ export function OpenVault({ onBack, onCreated, publicKey }: Props) {
       })
       const signedOpen = await signTransaction(openTx, publicKey)
       await submitSigned(signedOpen)
-
-      // vault_count - 1 is the new id (contract returns u32 but we don't get return value easily here)
-      // TODO: parse return value from simulation. For now: use vault_count view call after open.
-      // Approximation: 0 for first vault; full app would read from tx result.
-      const vaultId = 0 // simplified for demo; replace with tx result parsing
 
       // 3. deposit
       setStatus('Depositing…')

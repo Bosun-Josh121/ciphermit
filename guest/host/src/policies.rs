@@ -196,12 +196,7 @@ pub fn run_compliance_proof(input: ComplianceInput) -> Result<super::ProofRespon
         &ProverOpts::groth16(),
     )?;
     let journal_bytes = prove_info.receipt.journal.bytes.clone();
-
-    // Compliance journal: 3 × 32 = 96 bytes
-    let mut response = build_proof_response(prove_info.receipt, methods::COMPLIANCE_ID, &journal_bytes)?;
-    // Compliance has no new_spent_commitment; override to empty
-    response.new_spent_commitment = String::new();
-    Ok(response)
+    build_proof_response(prove_info.receipt, methods::COMPLIANCE_ID, &journal_bytes)
 }
 
 // ─── Allowlist ───────────────────────────────────────────────────────────────

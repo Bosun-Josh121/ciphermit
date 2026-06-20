@@ -149,16 +149,25 @@ fn proof_err(e: anyhow::Error) -> (StatusCode, Json<ErrorResponse>) {
     )
 }
 
+/// Convert risc0-build's native [u32; 8] image_id to 32 bytes (LE per word).
+pub fn id_to_bytes(id: [u32; 8]) -> [u8; 32] {
+    let mut bytes = [0u8; 32];
+    for (i, word) in id.iter().enumerate() {
+        bytes[i * 4..(i + 1) * 4].copy_from_slice(&word.to_le_bytes());
+    }
+    bytes
+}
+
 pub fn build_proof_response(
     receipt: risc0_zkvm::Receipt,
-    image_id: [u8; 32],
+    image_id: [u32; 8],
     journal_bytes: &[u8],
 ) -> Result<ProofResponse> {
     let seal = encode_seal(&receipt)?;
     let journal_digest: [u8; 32] = Sha256::digest(journal_bytes).into();
 
     // Parse the fixed-layout journal (4 × 32 bytes = 128 bytes)
-    assert!(journal_bytes.len() >= 128, "journal too short");
+    assert!(journal_bytes.len() >= 128, "journal too short: {}", journal_bytes.len());
     let policy_commitment = hex::encode(&journal_bytes[0..32]);
     let new_spent_commitment = hex::encode(&journal_bytes[32..64]);
     let nullifier = hex::encode(&journal_bytes[64..96]);
@@ -166,7 +175,7 @@ pub fn build_proof_response(
 
     Ok(ProofResponse {
         seal: hex::encode(seal),
-        image_id: hex::encode(image_id),
+        image_id: hex::encode(id_to_bytes(image_id)),
         journal_digest: hex::encode(journal_digest),
         policy_commitment,
         new_spent_commitment,

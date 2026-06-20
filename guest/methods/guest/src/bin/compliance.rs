@@ -22,8 +22,9 @@
 //!   nullifier_secret:  [u8; 32]
 //!   action_context:    [u8; 32]
 //!
-//! Public journal (96 bytes):
+//! Public journal (128 bytes):
 //!   compliance_commitment: [u8; 32]  sha256(deny_list_root || threshold || vault_secret)
+//!   new_spent_commitment:  [u8; 32]  all zeros — compliance has no spending budget
 //!   nullifier:             [u8; 32]
 //!   action_context:        [u8; 32]
 
@@ -118,7 +119,12 @@ fn main() {
         .finalize()
         .into();
 
+    // All journals must be 128 bytes (4 × 32) so the vault can reconstruct them.
+    // Compliance has no spending budget, so new_spent_commitment is a zero sentinel.
+    let new_spent_commitment = [0u8; 32];
+
     env::commit_slice(&compliance_commitment);
+    env::commit_slice(&new_spent_commitment);
     env::commit_slice(&nullifier);
     env::commit_slice(&action_context);
 }

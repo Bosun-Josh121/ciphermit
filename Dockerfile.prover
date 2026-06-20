@@ -1,0 +1,47 @@
+# Ciphermit Prover Service — Docker image
+#
+# Builds the prover binary inside a RISC Zero-capable image and produces
+# a minimal runtime image. Requires Docker socket access at runtime so the
+# risc0-groth16 backend can run the Groth16 compression container.
+#
+# Build:
+#   docker build -f Dockerfile.prover -t ciphermit-prover .
+#
+# Run (needs access to host Docker for Groth16):
+#   docker run -p 3001:3001 -v /var/run/docker.sock:/var/run/docker.sock ciphermit-prover
+#
+# Or on a plain VM (recommended for hackathon):
+#   Just run the pre-compiled binary directly — see scripts/start-prover.sh
+
+FROM rust:1.82-slim AS builder
+
+RUN apt-get update && apt-get install -y \
+    curl git pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install rzup and RISC Zero toolchain
+RUN curl -L https://risczero.com/install | bash
+ENV PATH="/root/.risc0/bin:/root/.cargo/bin:${PATH}"
+RUN rzup install && rzup install rust
+
+WORKDIR /build
+COPY guest/ ./guest/
+
+RUN cd guest && cargo build --release
+
+# ── Runtime image ──────────────────────────────────────────────────────────────
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Docker CLI (for risc0-groth16 backend)
+RUN curl -fsSL https://get.docker.com | sh
+
+COPY --from=builder /build/guest/target/release/prover /usr/local/bin/prover
+
+EXPOSE 3001
+ENV RUST_LOG=info
+
+CMD ["prover"]

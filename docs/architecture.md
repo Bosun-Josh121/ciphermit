@@ -36,10 +36,10 @@ The prover holds no keys and no funds. It only generates proofs. The user's wall
 `contracts/vault/src/lib.rs` — the policy + application layer.
 
 Storage per vault:
-- `admin`, `router`, `image_id` (fixed per policy type), `usdc_token`
+- `admin`, `router`, `image_id` (fixed per policy type), `token` (XLM SAC demo)
 - `owner`, `policy_commitment` (hash of hidden policy params)
 - `spent_commitment` (running hidden total, updated each spend)
-- `period_id`, `balance`, `used_nullifiers` (anti-replay set)
+- `period_id`, `balance`, `Nullifier(bytes32)` persistent set (anti-replay)
 
 Key invariants enforced on every `spend()`:
 1. `policy_commitment` matches stored value
@@ -70,7 +70,7 @@ Vault Contract
   │  5. router.verify(seal, image_id, journal_digest)  ← ZK proof check
   │  6. mark nullifier used
   │  7. update spent_commitment
-  │  8. transfer USDC to recipient
+  │  8. transfer XLM (SAC) to recipient
   ▼
 Stellar Ledger
      emit spend_authorized(amount)  ← NO policy/identity leakage
@@ -92,15 +92,42 @@ Stellar Ledger
 - Prover service can become a decentralized proving market (e.g., Bonsai network or self-hosted)
 - Policy issuance can be governed by multisig or DAO
 
+## Journal Layout (128 bytes, public output)
+
+```
+bytes  0–31   policy_commitment     sha256(period_cap_le ‖ period_id_le ‖ vault_secret)
+bytes 32–63   new_spent_commitment  sha256(new_spent_le ‖ period_id_le ‖ blinding)
+                                    [0u8;32] sentinel for stateless policies (compliance)
+bytes 64–95   nullifier             sha256(nullifier_secret ‖ action_context)
+bytes 96–127  action_context        sha256(sha256(owner_utf8) ‖ sha256(to_utf8) ‖ amount_u64_le)
+```
+
+## image_id Format
+
+`risc0-build 3.0.5` generates `pub const ALLOWANCE_ID: [u32; 8]`.
+Host converts to `[u8; 32]` via `word.to_le_bytes()` per word before passing to `encode_seal`.
+
+Real image_ids (extracted 2026-06-20):
+
+| Policy | image_id |
+|--------|---------|
+| allowance | `7a8db61b647a4861346733919e6f604feb7e2cf250e6fdf8ec6396394b05ecfa` |
+| delegat   | `172c2bfb05ced3b9e3dd95f83bc7129fd5e0fe4ed53b0b1e9c8f700c1c87dd7f` |
+| comply    | `e9783a82b6b4bea78556d464463187dcd036a4da460148b1c7c6aa7d1f92f5c6` |
+| allowlist | `9a1cf7769ce02e480bebff12a9dd517c77d97ebec369a57b60f6814929115e07` |
+
 ## Version Pins
 
-| Component | Version | Source |
-|---|---|---|
-| `soroban-sdk` | 25.1.0 | [crates.io](https://crates.io/crates/soroban-sdk) |
-| `risc0-zkvm` | ^3.0 | Matches Nethermind verifier parameters.json v3.0.0 |
-| `risc0-ethereum-contracts` | ^3.0 | Seal encoding |
-| `rust-toolchain` | stable | Required by RISC Zero 3.x |
-| Stellar CLI | 26.0.0 | Protocol 26 |
+| Component | Version |
+|---|---|
+| `soroban-sdk` | 25.1.0 |
+| `risc0-zkvm` | ^3.0 (3.0.5) |
+| `risc0-ethereum-contracts` | ^3.0 |
+| `cargo-risczero` | 3.0.5 |
+| `risc0-groth16` | 0.1.0 |
+| RISC Zero Rust toolchain | rust 1.94.1 (riscv32im-risc0-zkvm-elf) |
+| Stellar CLI | 26.0.0 |
+| Protocol | 26 |
 
 ## Contract Addresses (Testnet)
 

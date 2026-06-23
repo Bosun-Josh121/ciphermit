@@ -7,7 +7,7 @@
 | 2026-06-20 | All 4 RISC-V guest programs compiled (allowance, delegation, compliance, allowlist) |
 | 2026-06-20 | Real image_ids extracted and set on vault contract |
 | 2026-06-20 | Prover HTTP service built and running (`/health` verified) |
-| 2026-06-20 | E2E: vault opened, 1 XLM deposited, proof requested on testnet |
+| 2026-06-23 | **E2E COMPLETE**: real Groth16 proof verified on-chain, spend authorized, replay rejected |
 
 ## Deployed contracts (Stellar testnet)
 
@@ -19,11 +19,18 @@
 | Emergency Stop | `CBYTHZE3GMCLSYNO27RSMFB5IGESEGUVWDYA3PY3WPCPXLX35BRDIXGH` |
 | Ciphermit Vault | `CBHDNNIN76GWDVH3IGV43J2RM3DJSLN2VTTBOU3O5WITKIOSBQ4NDW7C` |
 
-## Guest program image_ids
+## Guest program image_ids (live on-chain)
 
 | Policy | image_id |
 |--------|---------|
-| allowance | `7a8db61b647a4861346733919e6f604feb7e2cf250e6fdf8ec6396394b05ecfa` |
-| delegation | `172c2bfb05ced3b9e3dd95f83bc7129fd5e0fe4ed53b0b1e9c8f700c1c87dd7f` |
-| compliance | `e9783a82b6b4bea78556d464463187dcd036a4da460148b1c7c6aa7d1f92f5c6` |
-| allowlist | `9a1cf7769ce02e480bebff12a9dd517c77d97ebec369a57b60f6814929115e07` |
+| allowance | `fdf6c03b01de4e98c577277a31db63e9c72620a5e81b9f0182e532339b15773e` |
+| delegation | `7f5340671b865d3d70cf07427b2327fa99478121ee4498297154874c9fe87472` |
+| compliance | `1029f6fab21490935a68acc8a941f4e3226d68460bb20b02c7047e855e8db17a` |
+| allowlist | `3c32e15c0993b4137b3728ae4c9d6fa7cf04d40933671a06ede6775eebdd3e39` |
+
+## Verified transactions
+
+| Event | Tx Hash | Explorer |
+|-------|---------|---------|
+| Phase 6 — allowance spend (vault 5, 0.1 XLM) | `e31ef4055450f11e858f5712d29c3cd8c2aa37d239ce4cc48a1837d844a66d85` | [view](https://stellar.expert/explorer/testnet/tx/e31ef4055450f11e858f5712d29c3cd8c2aa37d239ce4cc48a1837d844a66d85) |
+| Replay rejection | confirmed — nullifier already used → InvalidAction | — |

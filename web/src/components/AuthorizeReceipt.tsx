@@ -1,163 +1,162 @@
-import { useEffect, useRef, useState } from 'react'
-import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
-import { ExternalLink } from 'lucide-react'
-import { DocumentCard } from './ui/DocumentCard'
-import { Seal } from './seal/Seal'
-import { Guilloche } from './seal/Guilloche'
+import { useEffect, useState } from 'react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { Check, ExternalLink } from 'lucide-react'
+import { StatusChip } from './ui/StatusChip'
+import { DataRow } from './ui/DataRow'
 import type { ProofStage } from '../types/vault'
-
-const CIPHER_CHARS = '0123456789abcdef⌬◇△▽○●'
-
-function randomChar() {
-  return CIPHER_CHARS[Math.floor(Math.random() * CIPHER_CHARS.length)]
-}
-function scramble(length: number) {
-  return Array.from({ length }, randomChar).join('')
-}
-
-function truncMiddle(v: string, head = 6, tail = 6) {
-  if (v.length <= head + tail + 1) return v
-  return `${v.slice(0, head)}…${v.slice(-tail)}`
-}
 
 interface Props {
   stage: ProofStage
   recipient: string
-  amount: string // display string e.g. "12.50"
+  amount: string
   txHash?: string
   explorerUrl?: string
   errorReason?: string
 }
 
-const EYEBROW: Record<ProofStage, string> = {
-  idle: '',
-  building: 'Building proof',
-  verifying: 'Verifying on Stellar',
+const LABEL: Record<ProofStage, string> = {
+  idle:       '',
+  building:   'Proving privately…',
+  verifying:  'Verifying on Stellar…',
   authorized: 'Authorized',
-  failed: 'Not authorized',
-}
-
-function useScramble(active: boolean, length: number, prefersReduced: boolean) {
-  const [text, setText] = useState('')
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  useEffect(() => {
-    if (prefersReduced) {
-      setText(active ? '░'.repeat(length) : '')
-      return
-    }
-    if (!active) {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      return
-    }
-    intervalRef.current = setInterval(() => setText(scramble(length)), 1000 / 24)
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [active, length, prefersReduced])
-  return text
+  failed:     'Not authorized',
 }
 
 export function AuthorizeReceipt({ stage, recipient, amount, txHash, explorerUrl, errorReason }: Props) {
   const prefersReduced = useReducedMotion() ?? false
-  const isVeiled = stage === 'building' || stage === 'verifying'
+  const isVeiled    = stage === 'building' || stage === 'verifying'
   const isAuthorized = stage === 'authorized'
-  const isFailed = stage === 'failed'
-
-  const recipientCipher = useScramble(isVeiled, 14, prefersReduced)
-  const amountCipher = useScramble(isVeiled, 8, prefersReduced)
+  const isFailed     = stage === 'failed'
 
   const [typedHash, setTypedHash] = useState('')
   useEffect(() => {
     if (!isAuthorized || !txHash) { setTypedHash(''); return }
     if (prefersReduced) { setTypedHash(txHash); return }
     let i = 0
-    const interval = setInterval(() => {
-      i++
-      setTypedHash(txHash.slice(0, i))
-      if (i >= txHash.length) clearInterval(interval)
-    }, 18)
-    return () => clearInterval(interval)
+    const iv = setInterval(() => { i++; setTypedHash(txHash.slice(0, i)); if (i >= txHash.length) clearInterval(iv) }, 18)
+    return () => clearInterval(iv)
   }, [isAuthorized, txHash, prefersReduced])
 
-  const recipientDisplay = isVeiled ? recipientCipher : truncMiddle(recipient || '—')
-  const amountDisplay = isVeiled ? amountCipher : (amount || '0.00')
-
   return (
-    <DocumentCard
-      className={`relative overflow-hidden transition-shadow duration-300 ${isFailed ? 'ring-2 ring-reject/60' : ''}`}
-      microprint={txHash ? `AUTHORIZED ON STELLAR · ${txHash} ·` : undefined}
-    >
-      {/* Guilloché watermark, faint, behind content */}
-      <div
-        className={`absolute inset-0 pointer-events-none text-ink ${isVeiled && !prefersReduced ? 'animate-guilloche-spin' : ''}`}
-        style={{ opacity: 0.08 }}
-      >
-        <Guilloche stroke="var(--paper-ink)" />
-      </div>
-
-      <div className="relative z-10 space-y-4">
-        <div className="flex items-center justify-between">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={stage}
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className={`eyebrow text-xs ${
-                isAuthorized ? 'text-seal-deep' : isFailed ? 'text-reject' : 'text-verify'
-              }`}
-            >
-              {EYEBROW[stage]}
-            </motion.p>
-          </AnimatePresence>
-
-          {/* Seal stamp */}
-          <AnimatePresence>
-            {isAuthorized && (
-              <motion.div
-                initial={prefersReduced ? { opacity: 0 } : { scale: 2.4, opacity: 0, rotate: -8 }}
-                animate={{ scale: 1, opacity: 1, rotate: -6 }}
-                transition={prefersReduced ? { duration: 0.2 } : { type: 'spring', duration: 0.6, bounce: 0.5 }}
-              >
-                <Seal size={48} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        <div className="space-y-3 pt-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-paper-ink/60">Recipient</span>
-            <span className="mono text-xs text-paper-ink">{recipientDisplay}</span>
-          </div>
-          <div className="flex items-center justify-between pt-3 border-t border-paper-line/60">
-            <span className="text-xs text-paper-ink/60">Amount</span>
-            <span className="mono text-lg text-paper-ink">{amountDisplay} <span className="text-xs text-paper-ink/50">XLM</span></span>
-          </div>
-        </div>
-
-        {isFailed && errorReason && (
-          <p className="text-xs text-reject pt-2 border-t border-paper-line/60">{errorReason}</p>
-        )}
-
-        {isAuthorized && txHash && (
+    <div className="relative">
+      {/* Subtle glow orb behind the receipt when authorized */}
+      <AnimatePresence>
+        {isAuthorized && !prefersReduced && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="pt-3 border-t border-paper-line/60 space-y-1"
-          >
-            <p className="text-xs text-paper-ink/60">Transaction</p>
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mono text-xs text-verify hover:text-seal-deep transition-colors break-all flex items-center gap-1"
-            >
-              {typedHash || txHash}
-              <ExternalLink size={10} className="shrink-0" />
-            </a>
-          </motion.div>
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }}
+            className="absolute -inset-12 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse at center, rgba(46,230,197,0.10) 0%, transparent 70%)' }}
+          />
         )}
-      </div>
-    </DocumentCard>
+      </AnimatePresence>
+
+      <motion.div
+        className="relative rounded-2xl border bg-surface overflow-hidden shadow-[var(--shadow-float)]"
+        animate={{
+          borderColor: isFailed
+            ? ['rgba(244,121,107,0)', 'rgba(244,121,107,0.6)', 'rgba(244,121,107,0)']
+            : isAuthorized
+            ? 'rgba(46,230,197,0.30)'
+            : 'rgba(35,41,56,1)',
+        }}
+        transition={{ duration: isFailed ? 0.6 : 0.4 }}
+      >
+        {/* Slim accent progress line at top */}
+        {(stage === 'building' || stage === 'verifying') && (
+          <motion.div
+            className="absolute top-0 left-0 h-[2px] bg-accent rounded-full"
+            initial={{ width: '0%' }}
+            animate={{ width: stage === 'verifying' ? '85%' : '45%' }}
+            transition={{ duration: 1.2, ease: 'easeInOut' }}
+          />
+        )}
+
+        <div className="p-8">
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-6">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={stage}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className={`text-[13px] font-medium ${
+                  isAuthorized ? 'text-accent' : isFailed ? 'text-reject' : 'text-tx2'
+                }`}
+              >
+                {LABEL[stage]}
+              </motion.p>
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {isAuthorized && (
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 220, damping: 20 }}
+                >
+                  <StatusChip tone="accent" dot={false}>
+                    <Check size={11} className="mr-0.5" /> Authorized
+                  </StatusChip>
+                </motion.div>
+              )}
+              {isFailed && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <StatusChip tone="reject" dot={false}>Not authorized</StatusChip>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Values — blurred when veiled */}
+          <motion.div
+            animate={{
+              filter: isVeiled && !prefersReduced ? 'blur(7px)' : 'blur(0px)',
+              opacity: isVeiled ? 0.45 : 1,
+            }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="space-y-0"
+          >
+            <DataRow label="Recipient" value={recipient || '—'} truncateMiddle />
+            <DataRow label="Amount" value={`${amount || '0.00'} XLM`} />
+            {txHash && (
+              <DataRow label="Transaction" value={typedHash || txHash} copyable truncateMiddle />
+            )}
+          </motion.div>
+
+          {/* Shimmer overlay while veiled */}
+          {isVeiled && !prefersReduced && (
+            <div
+              className="absolute inset-0 pointer-events-none rounded-2xl overflow-hidden"
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent 0%, rgba(46,230,197,0.06) 50%, transparent 100%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.8s ease-in-out infinite',
+              }}
+            />
+          )}
+
+          {/* Error reason */}
+          {isFailed && errorReason && (
+            <p className="text-[13px] text-reject mt-4 pt-4 border-t border-border">{errorReason}</p>
+          )}
+
+          {/* Explorer link */}
+          {isAuthorized && explorerUrl && (
+            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+              className="mt-4 pt-4 border-t border-border">
+              <a href={explorerUrl} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-[13px] text-accent hover:underline">
+                View on Stellar <ExternalLink size={12} />
+              </a>
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
+    </div>
   )
 }

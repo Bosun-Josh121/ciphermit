@@ -10,33 +10,37 @@ interface Props {
   maxWidth?: string
 }
 
-export function Modal({ title, subtitle, onClose, closeDisabled, children, maxWidth = 'max-w-sm' }: Props) {
+export function Modal({ title, subtitle, onClose, closeDisabled, children, maxWidth = 'max-w-md' }: Props) {
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !closeDisabled) onClose()
-    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !closeDisabled) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose, closeDisabled])
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/72 backdrop-blur-[8px] flex items-center justify-center z-50 p-4"
       onMouseDown={e => { if (e.target === e.currentTarget && !closeDisabled) onClose() }}
     >
-      <div className={`bg-ink-raised border border-ink-line rounded-md w-full ${maxWidth} shadow-[var(--shadow-doc)]`}>
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+      <div
+        className={`bg-surface-2 border border-border rounded-[20px] w-full ${maxWidth} shadow-[var(--shadow-float)]`}
+        style={{ padding: '40px' }}
+      >
+        <div className="flex items-start justify-between mb-8">
           <div>
-            <h3 className="text-sm font-semibold text-bone">{title}</h3>
-            {subtitle && <p className="text-xs text-bone-dim mt-0.5">{subtitle}</p>}
+            <h3 className="text-[20px] font-semibold text-tx tracking-tight">{title}</h3>
+            {subtitle && <p className="text-[15px] text-tx2 mt-1.5 leading-relaxed">{subtitle}</p>}
           </div>
           {!closeDisabled && (
-            <button onClick={onClose} className="text-bone-dim hover:text-bone transition-colors">
-              <X size={16} />
+            <button
+              onClick={onClose}
+              className="text-tx3 hover:text-tx transition-colors -mt-1 -mr-2 p-2 rounded-lg hover:bg-surface-3"
+            >
+              <X size={18} />
             </button>
           )}
         </div>
-        <div className="px-5 pb-5">{children}</div>
+        {children}
       </div>
     </div>
   )

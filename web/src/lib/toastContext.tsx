@@ -48,13 +48,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={t.id}
             onMouseEnter={() => pause(t.id)}
             onMouseLeave={() => resume(t.id)}
-            className="bg-ink-raised border border-ink-line rounded-md px-4 py-3 shadow-[var(--shadow-doc)]
-                       flex items-start gap-2.5 animate-in"
+            className="bg-surface-2 border border-border-s rounded-2xl px-4 py-3 shadow-[var(--shadow-float)]
+                       flex items-start gap-2.5"
           >
-            {t.kind === 'success' && <CheckCircle2 size={15} className="text-verify shrink-0 mt-0.5" />}
+            {t.kind === 'success' && <CheckCircle2 size={15} className="text-verified shrink-0 mt-0.5" />}
             {t.kind === 'error' && <AlertCircle size={15} className="text-reject shrink-0 mt-0.5" />}
-            <p className="text-xs text-bone flex-1">{t.message}</p>
-            <button onClick={() => remove(t.id)} className="text-bone-dim hover:text-bone transition-colors">
+            <p className="text-[13px] text-tx flex-1">{t.message}</p>
+            <button onClick={() => remove(t.id)} className="text-tx3 hover:text-tx transition-colors">
               <X size={13} />
             </button>
           </div>

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Check, AlertCircle, ExternalLink } from 'lucide-react'
+import { Check, AlertCircle, ExternalLink, ChevronRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Modal } from './ui/Modal'
 import { Button } from './ui/Button'
-import { Stepper } from './ui/Stepper'
-import { buildOpenVaultTx, buildTokenApproveTx, buildDepositTx, submitSigned, getVaultCount } from '../lib/stellar'
+import {
+  buildOpenVaultTx, buildTokenApproveTx, buildDepositTx,
+  submitSigned, getVaultCount,
+} from '../lib/stellar'
 import { signTransaction } from '../lib/wallet'
 import { randomHex32 } from '../lib/prover'
 import { useWallet } from '../lib/walletContext'
@@ -13,15 +16,14 @@ import { NETWORK } from '../lib/config'
 import type { PolicyType, VaultInfo } from '../types/vault'
 import sha256 from '../lib/sha256'
 
-async function deriveCommitment(secret: string, cap: bigint, period: bigint): Promise<string> {
+async function deriveCommitment(secret: string, cap: bigint, period: bigint) {
   const buf = new Uint8Array(48)
   const v = new DataView(buf.buffer)
   v.setBigUint64(0, cap, true); v.setBigUint64(8, period, true)
   buf.set(Buffer.from(secret, 'hex'), 16)
   return sha256(buf)
 }
-
-async function deriveSpentCommitment(blinding: string, period: bigint): Promise<string> {
+async function deriveSpentCommitment(blinding: string, period: bigint) {
   const buf = new Uint8Array(48)
   const v = new DataView(buf.buffer)
   v.setBigUint64(0, 0n, true); v.setBigUint64(8, period, true)
@@ -30,26 +32,32 @@ async function deriveSpentCommitment(blinding: string, period: bigint): Promise<
 }
 
 const POLICIES: PolicyType[] = ['allowance', 'delegation', 'compliance', 'allowlist']
-const STEPS = [{ number: '1', label: 'Policy' }, { number: '2', label: 'Fund' }, { number: '3', label: 'Done' }]
-type Step = 0 | 1 | 2
+type Step   = 0 | 1 | 2
 type Status = 'idle' | 'approving' | 'opening' | 'depositing'
 
-export function OpenVaultModal({ onClose, onCreated }: { onClose: () => void; onCreated: (v: VaultInfo) => void }) {
-  const { publicKey } = useWallet()
-  const { addVault } = useVaults()
+const STATUS_LABEL: Record<Status, string> = {
+  idle: '', approving: 'Approving token…', opening: 'Opening vault…', depositing: 'Depositing…',
+}
 
-  const [step, setStep]           = useState<Step>(0)
-  const [policy, setPolicy]       = useState<PolicyType>('allowance')
-  const [periodCap, setPeriodCap] = useState('')
-  const [deposit, setDeposit]     = useState('')
-  const [status, setStatus]       = useState<Status>('idle')
-  const [error, setError]         = useState<string>()
-  const [txHash, setTxHash]       = useState<string>()
+const STEP_LABELS = ['Choose policy', 'Set rule & fund', 'Done']
+
+export function OpenVaultModal({
+  onClose, onCreated,
+}: { onClose: () => void; onCreated: (v: VaultInfo) => void }) {
+  const { publicKey } = useWallet()
+  const { addVault }  = useVaults()
+
+  const [step,        setStep]        = useState<Step>(0)
+  const [policy,      setPolicy]      = useState<PolicyType>('allowance')
+  const [periodCap,   setPeriodCap]   = useState('')
+  const [deposit,     setDeposit]     = useState('')
+  const [status,      setStatus]      = useState<Status>('idle')
+  const [error,       setError]       = useState<string>()
+  const [txHash,      setTxHash]      = useState<string>()
   const [previewHash, setPreviewHash] = useState<string>()
-  const [createdVault, setCreatedVault] = useState<VaultInfo>()
+  const [created,     setCreated]     = useState<VaultInfo>()
 
   const busy = status !== 'idle'
-  const statusLabel = { approving: 'Approving…', opening: 'Opening vault…', depositing: 'Depositing…', idle: '' }[status]
 
   useEffect(() => {
     if (policy !== 'allowance' || !periodCap) { setPreviewHash(undefined); return }
@@ -81,24 +89,25 @@ export function OpenVaultModal({ onClose, onCreated }: { onClose: () => void; on
       await submitSigned(await signTransaction(await buildTokenApproveTx(publicKey, depositStroops), publicKey))
       setStatus('opening')
       const openHash = await submitSigned(await signTransaction(
-        await buildOpenVaultTx({ owner: publicKey, policyType: policy, policyCommitmentHex: policyCommitment,
-          initialSpentCommitmentHex: spentCommitment, periodId }), publicKey))
+        await buildOpenVaultTx({
+          owner: publicKey, policyType: policy,
+          policyCommitmentHex: policyCommitment,
+          initialSpentCommitmentHex: spentCommitment, periodId,
+        }), publicKey))
       setStatus('depositing')
       await submitSigned(await signTransaction(await buildDepositTx(publicKey, vaultId, depositStroops), publicKey))
 
-      sessionStorage.setItem(`vault_${vaultId}_secret`,           secret)
-      sessionStorage.setItem(`vault_${vaultId}_blinding`,         blinding)
-      sessionStorage.setItem(`vault_${vaultId}_policy_commitment`,policyCommitment)
-      sessionStorage.setItem(`vault_${vaultId}_spent_commitment`, spentCommitment)
-      sessionStorage.setItem(`vault_${vaultId}_period_cap`,       capStroops.toString())
+      sessionStorage.setItem(`vault_${vaultId}_secret`,            secret)
+      sessionStorage.setItem(`vault_${vaultId}_blinding`,          blinding)
+      sessionStorage.setItem(`vault_${vaultId}_policy_commitment`, policyCommitment)
+      sessionStorage.setItem(`vault_${vaultId}_spent_commitment`,  spentCommitment)
+      sessionStorage.setItem(`vault_${vaultId}_period_cap`,        capStroops.toString())
 
-      const vault: VaultInfo = { id: vaultId, owner: publicKey, policyType: policy,
-        balance: depositStroops, periodId, policyCommitment, spentCommitment }
-      addVault(vault)
-      setCreatedVault(vault)
-      setTxHash(openHash)
-      setStatus('idle')
-      setStep(2)
+      const vault: VaultInfo = {
+        id: vaultId, owner: publicKey, policyType: policy,
+        balance: depositStroops, periodId, policyCommitment, spentCommitment,
+      }
+      addVault(vault); setCreated(vault); setTxHash(openHash); setStatus('idle'); setStep(2)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
       setStatus('idle')
@@ -111,16 +120,35 @@ export function OpenVaultModal({ onClose, onCreated }: { onClose: () => void; on
       subtitle={step === 2 ? undefined : 'A private spending permit on Stellar'}
       onClose={onClose}
       closeDisabled={busy}
-      maxWidth="max-w-[520px]"
+      maxWidth="max-w-[500px]"
     >
-      {/* Stepper */}
+      {/* ── Step indicator ── */}
       {step < 2 && (
-        <div className="mb-7">
-          <Stepper steps={STEPS} current={step} />
+        <div className="flex items-center gap-2 mb-8">
+          {STEP_LABELS.slice(0, 2).map((label, i) => {
+            const active = i === step
+            const done   = i < step
+            return (
+              <div key={label} className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors
+                  ${active ? 'bg-accent/10 border border-accent/25' : 'border border-transparent'}`}>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold
+                    ${done   ? 'bg-accent text-accent-text'
+                    : active ? 'bg-accent/20 text-accent border border-accent/40'
+                    :          'bg-surface-3 text-tx3'}`}>
+                    {done ? <Check size={10} /> : i + 1}
+                  </div>
+                  <span className={`text-[12px] font-semibold
+                    ${active ? 'text-tx' : 'text-tx3'}`}>{label}</span>
+                </div>
+                {i < 1 && <ChevronRight size={12} className="text-border shrink-0" />}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* ── Step 0: Choose policy ── */}
+      {/* ══ Step 0: Policy selection ══ */}
       {step === 0 && (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3">
@@ -128,105 +156,146 @@ export function OpenVaultModal({ onClose, onCreated }: { onClose: () => void; on
               const meta   = POLICY_META[type]
               const active = policy === type
               return (
-                <button
-                  key={type}
-                  onClick={() => setPolicy(type)}
-                  className={`flex flex-col items-start gap-2.5 text-left p-4 rounded-xl border transition-all
+                <button key={type} onClick={() => setPolicy(type)}
+                  className={`relative flex flex-col items-start gap-3 text-left p-4 rounded-xl
+                    border transition-all duration-150 group
                     ${active
-                      ? 'border-accent/40 bg-accent/6 shadow-[0_0_0_1px_rgba(46,230,197,0.12)]'
-                      : 'border-border bg-surface-2 hover:border-border-s hover:bg-surface-3'
-                    }`}
-                >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center
-                    ${active ? 'bg-accent/15' : 'bg-surface-3'}`}>
-                    <meta.icon size={13} className={active ? 'text-accent' : 'text-tx3'} />
+                      ? 'border-accent/50 bg-gradient-to-b from-accent/8 to-accent/3 shadow-[0_0_0_1px_rgba(46,230,197,0.12)]'
+                      : 'border-border bg-surface-2 hover:border-border-s hover:bg-surface-3'}`}>
+                  {active && (
+                    <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-accent
+                                    flex items-center justify-center">
+                      <Check size={9} className="text-accent-text" />
+                    </div>
+                  )}
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0
+                    ${active ? 'bg-accent/20' : 'bg-surface-3 group-hover:bg-surface-2'}`}>
+                    <meta.icon size={14} className={active ? 'text-accent' : 'text-tx3'} />
                   </div>
-                  <div>
-                    <p className={`text-[13px] font-semibold leading-tight ${active ? 'text-tx' : 'text-tx2'}`}>
+                  <div className="space-y-0.5">
+                    <p className={`text-[13px] font-bold leading-tight ${active ? 'text-tx' : 'text-tx2'}`}>
                       {meta.label}
                     </p>
-                    <p className="text-[11px] text-tx3 leading-snug mt-0.5">{meta.desc}</p>
+                    <p className="text-[11px] text-tx3 leading-snug">{meta.desc}</p>
                   </div>
                 </button>
               )
             })}
           </div>
-          <Button fullWidth onClick={() => setStep(1)}>Continue</Button>
-        </div>
-      )}
-
-      {/* ── Step 1: Rule + Fund ── */}
-      {step === 1 && (
-        <div className="space-y-5">
-          {policy === 'allowance' && (
-            <div className="space-y-2">
-              <label className="text-[13px] text-tx2 block font-medium">Period cap (XLM)</label>
-              <input
-                type="number" min="0" step="0.01" value={periodCap} disabled={busy}
-                onChange={e => setPeriodCap(e.target.value)} placeholder="500.00"
-                className="w-full mono text-[14px] bg-surface border border-border rounded-[10px] px-4 py-2.5
-                           text-tx placeholder:text-tx3 focus:border-accent focus:outline-none transition-colors"
-              />
-              <p className="text-[12px] text-tx3">
-                Stored as a private hash — the value never appears on-chain.
-              </p>
-              {previewHash && (
-                <div className="bg-surface rounded-lg border border-border px-3 py-2 mt-1">
-                  <p className="text-[10px] text-tx3 mb-1">Commitment preview</p>
-                  <p className="mono text-[10px] text-accent/60 break-all leading-relaxed">{previewHash}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label className="text-[13px] text-tx2 block font-medium">Initial deposit (XLM)</label>
-            <input
-              type="number" min="0" step="0.01" value={deposit} disabled={busy}
-              onChange={e => setDeposit(e.target.value)} placeholder="0.00"
-              className="w-full mono text-[14px] bg-surface border border-border rounded-[10px] px-4 py-2.5
-                         text-tx placeholder:text-tx3 focus:border-accent focus:outline-none transition-colors"
-            />
-          </div>
-
-          {error && (
-            <div className="bg-reject/8 border border-reject/20 rounded-xl px-4 py-3 flex items-start gap-2.5">
-              <AlertCircle size={14} className="text-reject mt-0.5 shrink-0" />
-              <p className="text-[13px] text-reject leading-snug">{error}</p>
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-1">
-            <Button variant="secondary" onClick={() => setStep(0)} disabled={busy}>Back</Button>
-            <Button fullWidth loading={busy} disabled={!deposit} onClick={handleIssue}>
-              {busy ? statusLabel : 'Deposit and issue vault'}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Step 2: Issued ── */}
-      {step === 2 && (
-        <div className="text-center py-2 space-y-6">
-          <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20
-                          flex items-center justify-center mx-auto">
-            <Check size={24} className="text-accent" />
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-[18px] font-semibold text-tx">Vault issued</p>
-            <p className="text-[14px] text-tx2">Your rule is committed privately. Ready to spend.</p>
-            {txHash && (
-              <a href={`https://stellar.expert/explorer/${NETWORK}/tx/${txHash}`}
-                target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[13px] text-accent hover:underline mt-2">
-                View transaction <ExternalLink size={11} />
-              </a>
-            )}
-          </div>
-          <Button variant="secondary" fullWidth onClick={() => createdVault && onCreated(createdVault)}>
-            Done
+          <Button fullWidth onClick={() => setStep(1)}>
+            Continue with {POLICY_META[policy].label}
           </Button>
         </div>
+      )}
+
+      {/* ══ Step 1: Rule + Fund ══ */}
+      {step === 1 && (
+        <AnimatePresence mode="wait">
+          <motion.div key="step1"
+            initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
+            className="space-y-5">
+
+            {policy === 'allowance' && (
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">
+                  Period cap (XLM)
+                </label>
+                <input
+                  type="number" min="0" step="0.01" value={periodCap} disabled={busy}
+                  onChange={e => setPeriodCap(e.target.value)} placeholder="500.00"
+                  className="w-full mono text-[20px] font-bold bg-surface border border-border rounded-xl
+                             px-4 py-3.5 pr-16 text-tx placeholder:text-tx3
+                             focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/20
+                             disabled:opacity-50 transition-all"
+                />
+                <p className="text-[12px] text-tx3">
+                  Stored as a private hash — the value never appears on-chain.
+                </p>
+                {previewHash && (
+                  <div className="bg-surface rounded-xl border border-border px-3.5 py-2.5">
+                    <p className="text-[10px] text-tx3 mb-1 font-semibold uppercase tracking-wide">
+                      Commitment hash preview
+                    </p>
+                    <p className="mono text-[10px] text-accent/60 break-all leading-relaxed">
+                      {previewHash}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">
+                Initial deposit (XLM)
+              </label>
+              <div className="relative">
+                <input
+                  type="number" min="0" step="0.01" value={deposit} disabled={busy}
+                  onChange={e => setDeposit(e.target.value)} placeholder="0.00"
+                  className="w-full mono text-[28px] font-extrabold bg-surface border border-border rounded-xl
+                             px-4 py-4 pr-20 text-tx placeholder:text-tx3
+                             focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/20
+                             disabled:opacity-50 transition-all"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 mono text-[14px] font-bold text-tx3">
+                  XLM
+                </span>
+              </div>
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-2.5 bg-reject/8 border border-reject/25
+                              rounded-xl px-4 py-3">
+                <AlertCircle size={14} className="text-reject mt-0.5 shrink-0" />
+                <p className="text-[13px] text-reject leading-snug">{error}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setStep(0)} disabled={busy}>
+                Back
+              </Button>
+              <Button fullWidth loading={busy} disabled={!deposit} onClick={handleIssue}>
+                {busy ? STATUS_LABEL[status] : 'Issue vault'}
+              </Button>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      )}
+
+      {/* ══ Step 2: Issued ══ */}
+      {step === 2 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+          className="text-center py-2 space-y-7">
+          <div className="space-y-4">
+            <motion.div
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 220, damping: 18, delay: 0.05 }}
+              className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20
+                         flex items-center justify-center mx-auto shadow-[var(--shadow-glow)]">
+              <Check size={26} className="text-accent" />
+            </motion.div>
+            <div className="space-y-1.5">
+              <p className="text-[20px] font-extrabold text-tx">Vault issued</p>
+              <p className="text-[14px] text-tx2 leading-relaxed">
+                Your rule is committed privately. Ready to spend.
+              </p>
+              {txHash && (
+                <a href={`https://stellar.expert/explorer/${NETWORK}/tx/${txHash}`}
+                  target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[13px] text-accent hover:underline mt-1">
+                  View transaction <ExternalLink size={11} />
+                </a>
+              )}
+            </div>
+          </div>
+          <Button variant="secondary" fullWidth
+            onClick={() => created && onCreated(created)}>
+            Go to vault
+          </Button>
+        </motion.div>
       )}
     </Modal>
   )

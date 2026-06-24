@@ -1,52 +1,60 @@
-@import '@fontsource/space-grotesk/500.css';
-@import '@fontsource/space-grotesk/600.css';
-@import '@fontsource/space-grotesk/700.css';
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
+@import '@fontsource/fraunces/500.css';
+@import '@fontsource/fraunces/600.css';
+@import '@fontsource/fraunces/600-italic.css';
+@import '@fontsource/geist-sans/400.css';
+@import '@fontsource/geist-sans/500.css';
+@import '@fontsource/geist-sans/600.css';
 @import '@fontsource/geist-mono/400.css';
 @import '@fontsource/geist-mono/500.css';
 
 @import "tailwindcss";
 
 :root {
-  --void:    #0A0B0F;
-  --surface: #10121A;
-  --panel:   #15171F;
-  --panel-2: #1A1D27;
-  --line:    #232733;
-  --line-2:  #2B303D;
-  --mute:    #6B7280;
-  --mute-2:  #8B93A3;
-  --ink:     #E8EAF0;
-  --seal:    #B8FF4F;
-  --seal-2:  #94D93D;
-  --breach:  #FF5C5C;
-  --amber:   #FFC857;
+  /* Ink surfaces — the app shell */
+  --ink:           #0C1614;
+  --ink-raised:    #121F1C;
+  --ink-line:      #233330;
+  --ink-line-soft: #1A2724;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 16px 48px -12px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-seal: 0 0 0 1px rgba(184, 255, 79, 0.15), 0 8px 24px -8px rgba(184, 255, 79, 0.12);
+  /* Paper surfaces — issued artifacts (vaults, permits, receipts) */
+  --paper:         #ECE7DA;
+  --paper-line:    #C9C1AE;
+  --paper-ink:     #1A2320;
+
+  /* Text on ink */
+  --bone:          #E8E3D6;
+  --bone-dim:      #948F84;
+
+  /* Accents — used with discipline */
+  --seal:          #C6A04E;
+  --seal-deep:     #9C7C36;
+  --verify:        #4FB7A6;
+  --reject:        #C24A36;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-seal:     cubic-bezier(0.34, 1.30, 0.50, 1);
+
+  --shadow-doc: 0 12px 32px -8px rgba(0, 0, 0, 0.45);
 }
 
 @theme inline {
-  --color-void:    var(--void);
-  --color-surface: var(--surface);
-  --color-panel:   var(--panel);
-  --color-panel-2: var(--panel-2);
-  --color-line:    var(--line);
-  --color-line-2:  var(--line-2);
-  --color-mute:    var(--mute);
-  --color-mute-2:  var(--mute-2);
-  --color-ink:     var(--ink);
-  --color-seal:    var(--seal);
-  --color-seal-2:  var(--seal-2);
-  --color-breach:  var(--breach);
-  --color-amber:   var(--amber);
+  --color-ink:           var(--ink);
+  --color-ink-raised:    var(--ink-raised);
+  --color-ink-line:      var(--ink-line);
+  --color-ink-line-soft: var(--ink-line-soft);
+  --color-paper:         var(--paper);
+  --color-paper-line:    var(--paper-line);
+  --color-paper-ink:     var(--paper-ink);
+  --color-bone:          var(--bone);
+  --color-bone-dim:      var(--bone-dim);
+  --color-seal:          var(--seal);
+  --color-seal-deep:     var(--seal-deep);
+  --color-verify:        var(--verify);
+  --color-reject:        var(--reject);
 
-  --font-display: 'Space Grotesk', sans-serif;
-  --font-body:    'Inter', sans-serif;
+  --font-display: 'Fraunces', serif;
+  --font-body:    'Geist Sans', sans-serif;
   --font-mono:    'Geist Mono', monospace;
 }
 
@@ -54,36 +62,56 @@
 html { font-size: 16px; }
 
 body {
-  background: var(--void);
-  color: var(--ink);
+  background: var(--ink);
+  color: var(--bone);
   font-family: var(--font-body);
-  line-height: 1.6;
+  line-height: 1.5;
   min-height: 100dvh;
   background-image:
-    radial-gradient(ellipse 800px 500px at 15% -10%, rgba(184, 255, 79, 0.06), transparent),
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
-  background-attachment: fixed, fixed;
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  background-attachment: fixed;
 }
 
-.mono { font-family: 'Geist Mono', monospace; }
+.mono { font-family: var(--font-mono); }
 .font-display { font-family: var(--font-display); }
+
+/* Eyebrow / Label style: 13px sans 500 uppercase +6% tracking */
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Paper grain — subtle material texture on document cards */
+.paper-grain {
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.05'/%3E%3C/svg%3E");
+}
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--line-2); }
+::-webkit-scrollbar-thumb { background: var(--ink-line); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-line-soft); }
 
-:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--verify); outline-offset: 2px; }
 
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-
 .skeleton {
-  background: linear-gradient(90deg, var(--panel) 25%, var(--panel-2) 50%, var(--panel) 75%);
+  background: linear-gradient(90deg, var(--ink-raised) 25%, var(--ink-line-soft) 50%, var(--ink-raised) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes guilloche-spin {
+  to { transform: rotate(360deg); }
+}
+.animate-guilloche-spin {
+  animation: guilloche-spin 60s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

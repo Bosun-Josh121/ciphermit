@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 interface Props {
@@ -11,19 +11,27 @@ interface Props {
 }
 
 export function Modal({ title, subtitle, onClose, closeDisabled, children, maxWidth = 'max-w-sm' }: Props) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !closeDisabled) onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, closeDisabled])
+
   return (
     <div
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onMouseDown={e => { if (e.target === e.currentTarget && !closeDisabled) onClose() }}
     >
-      <div className={`bg-panel border border-line rounded-2xl w-full ${maxWidth} shadow-[var(--shadow-lg)]`}>
+      <div className={`bg-ink-raised border border-ink-line rounded-md w-full ${maxWidth} shadow-[var(--shadow-doc)]`}>
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div>
-            <h3 className="text-sm font-semibold text-ink">{title}</h3>
-            {subtitle && <p className="text-xs text-mute mt-0.5">{subtitle}</p>}
+            <h3 className="text-sm font-semibold text-bone">{title}</h3>
+            {subtitle && <p className="text-xs text-bone-dim mt-0.5">{subtitle}</p>}
           </div>
           {!closeDisabled && (
-            <button onClick={onClose} className="text-mute hover:text-ink transition-colors">
+            <button onClick={onClose} className="text-bone-dim hover:text-bone transition-colors">
               <X size={16} />
             </button>
           )}

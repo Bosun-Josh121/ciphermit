@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.3.0",
+    "@fontsource/fraunces": "^5.2.9",
     "@fontsource/geist-mono": "^5.2.8",
+    "@fontsource/geist-sans": "^5.2.5",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
     "@stellar/stellar-sdk": "^13.3.0",

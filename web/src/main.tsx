@@ -4,12 +4,15 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { WalletProvider } from './lib/walletContext'
+import { ToastProvider } from './lib/toastContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <WalletProvider>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </WalletProvider>
     </BrowserRouter>
   </StrictMode>,

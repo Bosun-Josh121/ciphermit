@@ -86,10 +86,10 @@ export function CipherResolve({ stage, txHash, explorerUrl }: Props) {
   const color = stage === 'authorized' ? 'text-seal' : stage === 'failed' ? 'text-breach' : 'text-mute'
 
   return (
-    <div className="rounded-[6px] border border-line bg-panel p-5 space-y-4">
+    <div className="rounded-xl border border-line bg-panel p-6 space-y-4 shadow-[var(--shadow-md)]">
       {/* Cipher display */}
       <div
-        className={`mono text-sm tracking-wider min-h-[1.4em] transition-colors duration-300 ${color}`}
+        className={`mono text-base tracking-wider min-h-[1.4em] transition-colors duration-300 ${color}`}
         aria-live="polite"
         aria-label={STAGE_LABELS[stage]}
       >

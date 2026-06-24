@@ -1,46 +1,44 @@
 import { useState } from 'react'
-import { Card, SectionLabel } from '../components/Card'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Lock, AlertCircle } from 'lucide-react'
+import { Card, SectionLabel } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
 import { buildOpenVaultTx, buildTokenApproveTx, buildDepositTx, submitSigned, getVaultCount } from '../lib/stellar'
 import { signTransaction } from '../lib/wallet'
 import { randomHex32 } from '../lib/prover'
+import { useWallet } from '../lib/walletContext'
+import { useVaults } from '../lib/vaultsContext'
+import { POLICY_META } from '../lib/policyMeta'
 import type { PolicyType, VaultInfo } from '../types/vault'
 import sha256 from '../lib/sha256'
-
-interface Props {
-  onBack: () => void
-  onCreated: (vaultId: number, vault: VaultInfo) => void
-  publicKey: string
-}
-
-const POLICIES: { type: PolicyType; label: string; desc: string }[] = [
-  { type: 'allowance', label: 'Allowance', desc: 'Set a hidden spending cap that resets each period.' },
-  { type: 'delegation', label: 'Delegation', desc: 'Grant someone revocable, capped spending authority.' },
-  { type: 'compliance', label: 'Compliance', desc: 'Enforce sanctions rules and amount thresholds.' },
-  { type: 'allowlist', label: 'Allowlist', desc: 'Restrict spending to an approved set of recipients.' },
-]
 
 // Must match guest allowance.rs: sha256(period_cap_u64_le || period_id_u64_le || vault_secret)
 async function deriveAllowanceCommitment(vaultSecret: string, periodCapStroops: bigint, periodId: bigint): Promise<string> {
   const buf = new Uint8Array(48)
   const view = new DataView(buf.buffer)
-  view.setBigUint64(0, periodCapStroops, true)   // bytes 0-7:  period_cap LE
-  view.setBigUint64(8, periodId, true)            // bytes 8-15: period_id LE
-  buf.set(Buffer.from(vaultSecret, 'hex'), 16)    // bytes 16-47: vault_secret (32 bytes)
+  view.setBigUint64(0, periodCapStroops, true)
+  view.setBigUint64(8, periodId, true)
+  buf.set(Buffer.from(vaultSecret, 'hex'), 16)
   return sha256(buf)
 }
 
 // Must match guest allowance.rs: sha256(0_u64_le || period_id_u64_le || blinding)
-// (initial spent = 0, so new_spent = 0 for the first spend)
 async function deriveInitialSpentCommitment(blinding: string, periodId: bigint): Promise<string> {
   const buf = new Uint8Array(48)
   const view = new DataView(buf.buffer)
-  view.setBigUint64(0, 0n, true)      // bytes 0-7:  new_spent = 0 LE
-  view.setBigUint64(8, periodId, true) // bytes 8-15: period_id LE
-  buf.set(Buffer.from(blinding, 'hex'), 16)  // bytes 16-47: blinding (32 bytes)
+  view.setBigUint64(0, 0n, true)
+  view.setBigUint64(8, periodId, true)
+  buf.set(Buffer.from(blinding, 'hex'), 16)
   return sha256(buf)
 }
 
-export function OpenVault({ onBack, onCreated, publicKey }: Props) {
+const POLICIES: PolicyType[] = ['allowance', 'delegation', 'compliance', 'allowlist']
+
+export function OpenVault() {
+  const navigate = useNavigate()
+  const { publicKey } = useWallet()
+  const { addVault } = useVaults()
+
   const [policy, setPolicy] = useState<PolicyType>('allowance')
   const [periodCap, setPeriodCap] = useState('')
   const [depositAmount, setDepositAmount] = useState('')
@@ -49,6 +47,7 @@ export function OpenVault({ onBack, onCreated, publicKey }: Props) {
   const [error, setError] = useState<string>()
 
   async function handleCreate() {
+    if (!publicKey) return
     setLoading(true)
     setError(undefined)
     setStatus(undefined)
@@ -67,16 +66,13 @@ export function OpenVault({ onBack, onCreated, publicKey }: Props) {
       const policyCommitment = await deriveAllowanceCommitment(vaultSecret, periodCapStroops, periodId)
       const spentCommitment = await deriveInitialSpentCommitment(blinding, periodId)
 
-      // Read current vault_count before opening — the new vault_id will equal this value
       const vaultId = await getVaultCount()
 
-      // 1. Approve token spend
       setStatus('Approving token…')
       const approveTx = await buildTokenApproveTx(publicKey, depositStroops)
       const signedApprove = await signTransaction(approveTx, publicKey)
       await submitSigned(signedApprove)
 
-      // 2. open_vault
       setStatus('Opening vault…')
       const openTx = await buildOpenVaultTx({
         owner: publicKey,
@@ -88,13 +84,11 @@ export function OpenVault({ onBack, onCreated, publicKey }: Props) {
       const signedOpen = await signTransaction(openTx, publicKey)
       await submitSigned(signedOpen)
 
-      // 3. deposit
       setStatus('Depositing…')
       const depositTx = await buildDepositTx(publicKey, vaultId, depositStroops)
       const signedDeposit = await signTransaction(depositTx, publicKey)
       await submitSigned(signedDeposit)
 
-      // Store secrets in sessionStorage (real app: encrypted local storage or user-managed)
       sessionStorage.setItem(`vault_${vaultId}_secret`, vaultSecret)
       sessionStorage.setItem(`vault_${vaultId}_blinding`, blinding)
       sessionStorage.setItem(`vault_${vaultId}_policy_commitment`, policyCommitment)
@@ -110,7 +104,8 @@ export function OpenVault({ onBack, onCreated, publicKey }: Props) {
         policyCommitment,
         spentCommitment,
       }
-      onCreated(vaultId, vault)
+      addVault(vault)
+      navigate(`/app/vaults/${vaultId}`)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -120,85 +115,98 @@ export function OpenVault({ onBack, onCreated, publicKey }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <button onClick={onBack} className="mono text-xs text-mute hover:text-ink transition-colors">
-        ← back
+    <div className="space-y-8 max-w-2xl">
+      <button
+        onClick={() => navigate('/app')}
+        className="inline-flex items-center gap-1.5 mono text-xs text-mute hover:text-ink transition-colors"
+      >
+        <ArrowLeft size={13} /> back to vaults
       </button>
 
-      <SectionLabel>Open a vault</SectionLabel>
+      <div>
+        <h1 className="font-display text-2xl font-semibold text-ink tracking-tight">Open a vault</h1>
+        <p className="text-sm text-mute mt-1">Choose a policy and fund it. Your rule stays private.</p>
+      </div>
 
-      <div className="space-y-2">
-        <p className="text-xs text-mute mb-3">Choose a policy type</p>
-        <div className="grid grid-cols-2 gap-2">
-          {POLICIES.map(p => (
-            <button
-              key={p.type}
-              onClick={() => setPolicy(p.type)}
-              className={`text-left p-4 rounded-[6px] border transition-colors ${
-                policy === p.type
-                  ? 'border-seal bg-seal/5 text-ink'
-                  : 'border-line bg-panel text-mute hover:border-mute'
-              }`}
-            >
-              <p className="text-sm font-medium">{p.label}</p>
-              <p className="text-xs mt-1 opacity-70">{p.desc}</p>
-            </button>
-          ))}
+      <div>
+        <SectionLabel>Step 1 — Choose a policy</SectionLabel>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {POLICIES.map(type => {
+            const meta = POLICY_META[type]
+            const active = policy === type
+            return (
+              <button
+                key={type}
+                onClick={() => setPolicy(type)}
+                className={`text-left p-4 rounded-xl border transition-all duration-150 space-y-2
+                  ${active
+                    ? 'border-seal bg-seal/5 shadow-[var(--shadow-seal)]'
+                    : 'border-line bg-panel hover:border-line-2 hover:bg-panel-2'}`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center
+                  ${active ? 'bg-seal/15 text-seal' : 'bg-panel-2 text-mute-2 border border-line-2'}`}>
+                  <meta.icon size={15} />
+                </div>
+                <p className={`text-sm font-medium ${active ? 'text-ink' : 'text-ink'}`}>{meta.label}</p>
+                <p className="text-xs text-mute leading-relaxed">{meta.desc}</p>
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      <Card className="space-y-4">
-        {policy === 'allowance' && (
+      <div>
+        <SectionLabel>Step 2 — Fund the vault</SectionLabel>
+        <Card className="space-y-5">
+          {policy === 'allowance' && (
+            <div className="space-y-2">
+              <label className="mono text-xs text-mute flex items-center gap-1.5">
+                Period cap (XLM) <Lock size={11} className="text-seal" />
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={periodCap}
+                onChange={e => setPeriodCap(e.target.value)}
+                placeholder="500.00"
+                className="w-full mono text-sm bg-void border border-line rounded-lg px-3.5 py-3
+                           text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
+              />
+              <p className="text-xs text-mute">This amount becomes a hidden commitment — no one on-chain can read it.</p>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <label className="mono text-xs text-mute block">
-              Period cap (XLM) — <span className="text-seal">stays private</span>
-            </label>
+            <label className="mono text-xs text-mute block">Initial deposit (XLM)</label>
             <input
               type="number"
               min="0"
               step="0.01"
-              value={periodCap}
-              onChange={e => setPeriodCap(e.target.value)}
-              placeholder="500.00"
-              className="w-full mono text-sm bg-void border border-line rounded-[6px] px-3 py-2.5
-                         text-ink placeholder:text-mute focus:border-seal focus:outline-none"
+              value={depositAmount}
+              onChange={e => setDepositAmount(e.target.value)}
+              placeholder="100.00"
+              className="w-full mono text-sm bg-void border border-line rounded-lg px-3.5 py-3
+                         text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
             />
-            <p className="text-xs text-mute">
-              This amount becomes a hidden commitment. No one on-chain can read it.
-            </p>
           </div>
-        )}
 
-        <div className="space-y-2">
-          <label className="mono text-xs text-mute block">Initial deposit (XLM)</label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={depositAmount}
-            onChange={e => setDepositAmount(e.target.value)}
-            placeholder="100.00"
-            className="w-full mono text-sm bg-void border border-line rounded-[6px] px-3 py-2.5
-                       text-ink placeholder:text-mute focus:border-seal focus:outline-none"
-          />
-        </div>
+          <div className="pt-3 border-t border-line space-y-1">
+            <p className="text-xs text-mute">From</p>
+            <p className="mono text-xs text-ink break-all">{publicKey}</p>
+          </div>
 
-        <div className="pt-2 border-t border-line space-y-1">
-          <p className="text-xs text-mute">From</p>
-          <p className="mono text-xs text-ink break-all">{publicKey}</p>
-        </div>
+          <Button fullWidth size="lg" loading={loading} disabled={!depositAmount} onClick={handleCreate}>
+            {loading ? (status ?? 'Opening vault…') : 'Open vault'}
+          </Button>
 
-        <button
-          onClick={handleCreate}
-          disabled={loading || !depositAmount}
-          className="w-full py-3 rounded-[6px] bg-seal text-void font-semibold text-sm
-                     disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-        >
-          {loading ? (status ?? 'Opening vault…') : 'Open vault'}
-        </button>
-
-        {error && <p className="mono text-xs text-breach">{error}</p>}
-      </Card>
+          {error && (
+            <p className="mono text-xs text-breach flex items-center gap-1.5">
+              <AlertCircle size={12} /> {error}
+            </p>
+          )}
+        </Card>
+      </div>
     </div>
   )
 }

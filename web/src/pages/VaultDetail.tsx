@@ -146,7 +146,7 @@ export function VaultDetail() {
               value={recipient}
               onChange={e => setRecipient(e.target.value)}
               placeholder="G..."
-              className="w-full mono text-xs bg-void border border-line rounded-lg px-3.5 py-3
+              className="w-full mono text-xs bg-void border border-line-2 rounded-lg px-3.5 py-3
                          text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
               disabled={busy}
             />
@@ -160,7 +160,7 @@ export function VaultDetail() {
               value={amount}
               onChange={e => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full mono text-sm bg-void border border-line rounded-lg px-3.5 py-3
+              className="w-full mono text-sm bg-void border border-line-2 rounded-lg px-3.5 py-3
                          text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
               disabled={busy}
             />

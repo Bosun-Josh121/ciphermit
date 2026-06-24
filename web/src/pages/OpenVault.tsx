@@ -170,7 +170,7 @@ export function OpenVault() {
                 value={periodCap}
                 onChange={e => setPeriodCap(e.target.value)}
                 placeholder="500.00"
-                className="w-full mono text-sm bg-void border border-line rounded-lg px-3.5 py-3
+                className="w-full mono text-sm bg-void border border-line-2 rounded-lg px-3.5 py-3
                            text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
               />
               <p className="text-xs text-mute">This amount becomes a hidden commitment — no one on-chain can read it.</p>
@@ -186,7 +186,7 @@ export function OpenVault() {
               value={depositAmount}
               onChange={e => setDepositAmount(e.target.value)}
               placeholder="100.00"
-              className="w-full mono text-sm bg-void border border-line rounded-lg px-3.5 py-3
+              className="w-full mono text-sm bg-void border border-line-2 rounded-lg px-3.5 py-3
                          text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
             />
           </div>

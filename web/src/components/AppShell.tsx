@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { LayoutGrid, Plus, Wallet, LogOut, ShieldCheck } from 'lucide-react'
+import { ShieldCheck, Wallet, LogOut } from 'lucide-react'
 import { useWallet } from '../lib/walletContext'
 import { NETWORK } from '../lib/config'
 import { Button } from './ui/Button'
 
 const NAV = [
-  { to: '/app', label: 'Vaults', icon: LayoutGrid, end: true },
-  { to: '/app/vaults/new', label: 'New vault', icon: Plus, end: false },
+  { to: '/app', label: 'Vaults', end: true },
 ]
 
 function truncate(addr: string) {
@@ -24,63 +23,55 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-dvh flex">
-      {/* Sidebar */}
-      <aside className="w-60 shrink-0 border-r border-line bg-surface flex flex-col">
-        <div className="px-5 py-5 border-b border-line">
-          <Link to="/" className="flex items-center gap-2 group">
-            <span className="w-7 h-7 rounded-md bg-seal/10 border border-seal/25 flex items-center justify-center">
-              <ShieldCheck size={14} className="text-seal" />
-            </span>
-            <span className="font-display font-semibold text-ink tracking-tight group-hover:text-seal transition-colors">
-              ciphermit
-            </span>
+    <div className="min-h-dvh bg-void text-ink flex flex-col">
+      <header className="sticky top-0 z-20 bg-void/95 backdrop-blur-xl border-b border-line shrink-0">
+        <div className="max-w-screen-xl mx-auto px-4 flex items-center gap-3 h-12">
+          <Link to="/" className="flex items-center gap-2 shrink-0">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-seal to-seal-2 flex items-center justify-center">
+              <ShieldCheck size={12} className="text-void" />
+            </div>
+            <span className="font-display font-semibold text-sm text-ink">ciphermit</span>
           </Link>
-        </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                 ${isActive ? 'bg-seal/10 text-seal' : 'text-mute hover:text-ink hover:bg-panel'}`
-              }
-            >
-              <item.icon size={16} />
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="px-3 py-4 border-t border-line space-y-2">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-panel border border-line">
-            <Wallet size={14} className="text-mute-2 shrink-0" />
-            <span className="mono text-xs text-ink truncate">
-              {publicKey ? truncate(publicKey) : 'Not connected'}
-            </span>
+          <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-md bg-panel-2 border border-line-2 text-xs text-mute-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-seal animate-pulse" />
+            {NETWORK}
           </div>
-          <div className="flex items-center justify-between px-1">
-            <span className="mono text-[11px] uppercase tracking-wide text-mute">{NETWORK}</span>
-            {publicKey && (
-              <button
-                onClick={handleDisconnect}
-                className="text-mute hover:text-breach transition-colors p-1"
-                title="Disconnect"
+
+          <div className="flex-1" />
+
+          <nav className="hidden sm:flex items-center gap-0.5">
+            {NAV.map(n => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                end={n.end}
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    isActive ? 'bg-panel-2 text-ink' : 'text-mute hover:text-ink hover:bg-panel/60'
+                  }`
+                }
               >
+                {n.label}
+              </NavLink>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2 pl-3 border-l border-line shrink-0">
+            <Wallet size={12} className="text-mute-2" />
+            <span className="mono text-xs text-mute hidden md:block">
+              {publicKey ? truncate(publicKey) : ''}
+            </span>
+            {publicKey && (
+              <button onClick={handleDisconnect} title="Disconnect" className="text-mute hover:text-breach transition-colors">
                 <LogOut size={13} />
               </button>
             )}
           </div>
         </div>
-      </aside>
+      </header>
 
-      {/* Main content */}
-      <main className="flex-1 min-w-0">
-        <div className="max-w-5xl mx-auto px-8 py-10">{children}</div>
-      </main>
+      <main className="flex-1 max-w-screen-xl w-full mx-auto px-4 py-6">{children}</main>
     </div>
   )
 }
@@ -91,7 +82,7 @@ export function ConnectGate({ children }: { children: ReactNode }) {
   if (publicKey) return <>{children}</>
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-6">
+    <div className="min-h-dvh flex items-center justify-center px-6 bg-void">
       <div className="max-w-sm w-full text-center space-y-6">
         <div className="w-12 h-12 rounded-xl bg-seal/10 border border-seal/25 flex items-center justify-center mx-auto">
           <ShieldCheck size={22} className="text-seal" />

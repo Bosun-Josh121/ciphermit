@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, AlertCircle, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, AlertCircle, ShieldCheck, ExternalLink } from 'lucide-react'
 import { CipherResolve } from '../components/CipherResolve'
 import { Card, SectionLabel } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { StatusChip } from '../components/ui/StatusChip'
 import { IconCircle } from '../components/ui/StatCard'
 import { computeActionContext, proveAllowance, randomHex32 } from '../lib/prover'
 import { buildSpendTx, submitSigned } from '../lib/stellar'
@@ -31,13 +32,8 @@ export function VaultDetail() {
 
   if (!vault || !publicKey) {
     return (
-      <div className="space-y-6 max-w-2xl">
-        <button
-          onClick={() => navigate('/app')}
-          className="inline-flex items-center gap-1.5 mono text-xs text-mute hover:text-ink transition-colors"
-        >
-          <ArrowLeft size={13} /> back to vaults
-        </button>
+      <div className="space-y-4 max-w-lg">
+        <BackLink navigate={navigate} />
         <Card className="text-center py-12 space-y-2">
           <p className="text-ink font-medium">Vault not found</p>
           <p className="text-sm text-mute">
@@ -110,91 +106,131 @@ export function VaultDetail() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <button
-        onClick={() => navigate('/app')}
-        className="inline-flex items-center gap-1.5 mono text-xs text-mute hover:text-ink transition-colors"
-      >
-        <ArrowLeft size={13} /> back to vaults
-      </button>
+    <div className="space-y-4">
+      <BackLink navigate={navigate} />
 
-      <Card elevated className="space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <IconCircle tone="seal"><meta.icon size={17} /></IconCircle>
-            <div>
-              <p className="font-medium text-ink">{meta.label} vault</p>
-              <p className="mono text-xs text-mute">#{vault.id}</p>
+      <div className="grid grid-cols-12 gap-4 items-start">
+        {/* Left: vault info + activity */}
+        <div className="col-span-12 lg:col-span-4 space-y-3">
+          <div className="rounded-xl border border-line bg-panel p-4 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <IconCircle tone="seal"><meta.icon size={16} /></IconCircle>
+              <div>
+                <p className="text-sm font-medium text-ink">{meta.label} vault</p>
+                <p className="mono text-xs text-mute">#{vault.id}</p>
+              </div>
+            </div>
+            <div className="bg-panel-2 rounded-lg p-3.5 space-y-2.5">
+              <div>
+                <p className="text-xs text-mute mb-1">Balance</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="mono text-xl font-semibold text-ink">{(Number(vault.balance) / 1e7).toFixed(2)}</span>
+                  <span className="text-xs text-mute">XLM</span>
+                </div>
+              </div>
+              <div className="pt-2.5 border-t border-line flex items-center justify-between">
+                <span className="text-xs text-mute">Period</span>
+                <Badge tone="neutral">{vault.periodId.toString()}</Badge>
+              </div>
             </div>
           </div>
-          <Badge tone="neutral">Period {vault.periodId.toString()}</Badge>
-        </div>
-        <div className="pt-4 border-t border-line flex items-baseline justify-between">
-          <span className="mono text-xs text-mute">Balance</span>
-          <span className="mono text-xl text-ink">
-            {(Number(vault.balance) / 1e7).toFixed(2)} <span className="text-sm text-mute">XLM</span>
-          </span>
-        </div>
-      </Card>
 
-      <div>
-        <SectionLabel>Authorize a spend</SectionLabel>
-        <Card className="space-y-4">
-          <div className="space-y-2">
-            <label className="mono text-xs text-mute block">Recipient address</label>
-            <input
-              value={recipient}
-              onChange={e => setRecipient(e.target.value)}
-              placeholder="G..."
-              className="w-full mono text-xs bg-void border border-line-2 rounded-lg px-3.5 py-3
-                         text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
-              disabled={busy}
-            />
+          <div className="rounded-xl border border-line bg-panel p-4 space-y-2.5">
+            <p className="text-xs font-semibold text-ink">Proof status</p>
+            {stage === 'idle' && <StatusChip tone="mute">Awaiting spend</StatusChip>}
+            {(stage === 'building' || stage === 'verifying') && (
+              <StatusChip tone="amber" pulse>{stage === 'building' ? 'Generating proof' : 'Verifying on-chain'}</StatusChip>
+            )}
+            {stage === 'authorized' && <StatusChip tone="seal">Authorized</StatusChip>}
+            {stage === 'failed' && <StatusChip tone="breach">Rejected</StatusChip>}
+            {explorerUrl && (
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-xs text-mute hover:text-ink transition-colors mono"
+              >
+                <ExternalLink size={11} /> view transaction
+              </a>
+            )}
           </div>
-          <div className="space-y-2">
-            <label className="mono text-xs text-mute block">Amount (XLM)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="w-full mono text-sm bg-void border border-line-2 rounded-lg px-3.5 py-3
-                         text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
-              disabled={busy}
-            />
+        </div>
+
+        {/* Right: spend form + proof animation */}
+        <div className="col-span-12 lg:col-span-8 space-y-4">
+          <div>
+            <SectionLabel>Authorize a spend</SectionLabel>
+            <Card className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="mono text-xs text-mute block">Recipient address</label>
+                  <input
+                    value={recipient}
+                    onChange={e => setRecipient(e.target.value)}
+                    placeholder="G..."
+                    className="w-full mono text-xs bg-void border border-line-2 rounded-lg px-3.5 py-3
+                               text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
+                    disabled={busy}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="mono text-xs text-mute block">Amount (XLM)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full mono text-sm bg-void border border-line-2 rounded-lg px-3.5 py-3
+                               text-ink placeholder:text-mute/60 focus:border-seal focus:outline-none transition-colors"
+                    disabled={busy}
+                  />
+                </div>
+              </div>
+
+              <Button
+                fullWidth
+                size="lg"
+                icon={<ShieldCheck size={15} />}
+                loading={busy}
+                disabled={!recipient || !amount}
+                onClick={handleSpend}
+              >
+                {busy ? 'Authorizing…' : 'Authorize privately'}
+              </Button>
+
+              {error && stage === 'failed' && (
+                <p className="mono text-xs text-breach flex items-center gap-1.5">
+                  <AlertCircle size={12} /> {error}
+                </p>
+              )}
+            </Card>
           </div>
 
-          <Button
-            fullWidth
-            size="lg"
-            icon={<ShieldCheck size={15} />}
-            loading={busy}
-            disabled={!recipient || !amount}
-            onClick={handleSpend}
-          >
-            {busy ? 'Authorizing…' : 'Authorize privately'}
-          </Button>
-
-          {error && stage === 'failed' && (
-            <p className="mono text-xs text-breach flex items-center gap-1.5">
-              <AlertCircle size={12} /> {error}
-            </p>
+          {stage !== 'idle' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              <CipherResolve stage={stage} txHash={txHash} explorerUrl={explorerUrl} />
+            </motion.div>
           )}
-        </Card>
+
+          <p className="text-xs text-mute leading-relaxed">
+            Your policy limits and spending history stay private. The chain records only that a valid
+            proof was presented — nothing else.
+          </p>
+        </div>
       </div>
-
-      {stage !== 'idle' && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <CipherResolve stage={stage} txHash={txHash} explorerUrl={explorerUrl} />
-        </motion.div>
-      )}
-
-      <p className="text-xs text-mute leading-relaxed">
-        Your policy limits and spending history stay private. The chain records only that a valid
-        proof was presented — nothing else.
-      </p>
     </div>
+  )
+}
+
+function BackLink({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
+  return (
+    <button
+      onClick={() => navigate('/app')}
+      className="inline-flex items-center gap-1.5 mono text-xs text-mute hover:text-ink transition-colors"
+    >
+      <ArrowLeft size={13} /> back to vaults
+    </button>
   )
 }

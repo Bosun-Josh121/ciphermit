@@ -91,7 +91,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       {/* identity block */}
-      <div className="p-3 border-t border-border/60 shrink-0 space-y-2">
+      <div className="p-4 border-t border-border/60 shrink-0 space-y-2">
         <div className="flex items-center gap-2 px-2 py-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
           <span className="mono text-[11px] text-tx3 uppercase tracking-wide">{NETWORK}</span>

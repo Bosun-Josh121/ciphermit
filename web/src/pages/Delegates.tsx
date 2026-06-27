@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { UserPlus, Users, Lock, X, AlertCircle, ChevronDown, Check } from 'lucide-react'
 import { Panel, SectionHead, EmptyState } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
+import { GhostBar } from '../components/ui/Ghost'
 import { StatusChip } from '../components/ui/StatusChip'
 import { useHeaderAction } from '../components/AppShell'
 import { useVaults } from '../lib/vaultsContext'
@@ -73,13 +74,30 @@ export function Delegates() {
           )} />
 
         {delegates.length === 0 ? (
-          <Panel glow>
-            <EmptyState
-              icon={<Users size={24} className="text-accent" />}
-              title="No delegates yet"
-              desc="Grant a delegate to give a capped, revocable spending allowance. The cap is committed as a private hash, not stored in the clear."
-              action={<Button icon={<UserPlus size={15} />} onClick={() => setShowForm(true)}>Grant a delegate</Button>}
-            />
+          <Panel className="overflow-hidden">
+            <div className="hidden sm:grid grid-cols-[1.4fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-border
+                            text-[10px] uppercase tracking-wide font-semibold text-tx3">
+              <span>Delegate</span><span>Vault</span><span>Sub-cap</span><span>Granted</span><span>Status</span>
+            </div>
+            <div className="relative">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="grid grid-cols-[1.4fr_1fr_1fr_1fr_auto] gap-4 px-5 py-4 items-center opacity-50">
+                  <GhostBar w={150} /><GhostBar w={80} /><GhostBar w={70} /><GhostBar w={90} />
+                  <GhostBar w={56} h={18} className="rounded-full" />
+                </div>
+              ))}
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
+                <div className="bg-bg/60 backdrop-blur-[1px] px-6 py-4 rounded-xl space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-[14px] font-extrabold text-tx">No delegates yet</p>
+                    <p className="text-[12px] text-tx2 max-w-[340px] leading-relaxed">
+                      Grant a delegate to give a capped, revocable allowance. The cap is committed as a private hash.
+                    </p>
+                  </div>
+                  <Button size="sm" icon={<UserPlus size={14} />} onClick={() => setShowForm(true)}>Grant a delegate</Button>
+                </div>
+              </div>
+            </div>
           </Panel>
         ) : (
           <Panel className="overflow-hidden">

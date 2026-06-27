@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ScanEye, ChevronDown, Check, KeyRound, Lock, ExternalLink, ShieldCheck } from 'lucide-react'
-import { Panel, EmptyState } from '../components/ui/Panel'
+import { Panel } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
 import { useHeaderAction } from '../components/AppShell'
 import { useVaults } from '../lib/vaultsContext'
@@ -43,18 +43,7 @@ export function Audit() {
 
   function selectTx(id: string) { setTxId(id); setDrop(false); setReveal(false); setKey(''); setError(undefined) }
 
-  if (disclosable.length === 0) {
-    return (
-      <Panel glow>
-        <EmptyState
-          icon={<ScanEye size={24} className="text-accent" />}
-          title="Nothing to disclose yet"
-          desc="Once you authorize a spend or make a deposit, you can selectively reveal that single transaction here using its vault view key."
-          action={<Button onClick={() => navigate('/app/authorize')}>Authorize a spend</Button>}
-        />
-      </Panel>
-    )
-  }
+  const empty = disclosable.length === 0
 
   return (
     <div className="grid lg:grid-cols-2 gap-6 items-start">
@@ -65,14 +54,24 @@ export function Audit() {
           <p className="text-[12px] text-tx2 mt-0.5">Reveal exactly one transaction to an auditor — nothing else.</p>
         </div>
 
+        {empty && (
+          <div className="flex items-start gap-3 bg-surface-2 border border-border rounded-xl px-4 py-3">
+            <ScanEye size={14} className="text-tx3 mt-0.5 shrink-0" />
+            <p className="text-[12px] text-tx2 leading-relaxed">
+              Nothing to disclose yet. Authorize a spend or make a deposit, then return here to reveal that one
+              transaction with its vault view key.
+            </p>
+          </div>
+        )}
+
         {/* tx selector */}
         <div className="space-y-2">
           <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">Transaction</label>
           <div className="relative">
-            <button onClick={() => setDrop(o => !o)}
+            <button onClick={() => !empty && setDrop(o => !o)} disabled={empty}
               className="w-full flex items-center justify-between gap-3 bg-surface-2 border border-border rounded-xl
-                         px-4 py-3.5 text-left hover:border-border-s transition-colors">
-              {rec ? <TxOption rec={rec} /> : <span className="text-tx3 text-[13px]">Select a transaction</span>}
+                         px-4 py-3.5 text-left hover:border-border-s transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {rec ? <TxOption rec={rec} /> : <span className="text-tx3 text-[13px]">No transactions yet</span>}
               <ChevronDown size={16} className={`text-tx3 shrink-0 transition-transform ${dropOpen ? 'rotate-180' : ''}`} />
             </button>
             {dropOpen && (
@@ -102,10 +101,11 @@ export function Audit() {
           </div>
           <div className="relative">
             <KeyRound size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-tx3" />
-            <input type="password" value={key} onChange={e => { setKey(e.target.value); setReveal(false) }}
+            <input type="password" value={key} disabled={empty} onChange={e => { setKey(e.target.value); setReveal(false) }}
               placeholder="Paste the vault view key" autoComplete="off"
               className="w-full mono text-[13px] bg-surface-2 border border-border rounded-xl pl-11 pr-4 py-3.5 text-tx
-                         placeholder:text-tx3 focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/20 transition-all" />
+                         placeholder:text-tx3 focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/20
+                         disabled:opacity-50 disabled:cursor-not-allowed transition-all" />
           </div>
           <p className="text-[11px] text-tx3">The key is checked locally and scopes disclosure to this one transaction.</p>
         </div>
@@ -116,9 +116,15 @@ export function Audit() {
           </div>
         )}
 
-        <Button fullWidth size="lg" icon={<ScanEye size={15} />} onClick={attemptReveal} disabled={revealed}>
-          {revealed ? 'Revealed' : 'Reveal this transaction'}
-        </Button>
+        {empty ? (
+          <Button fullWidth size="lg" variant="secondary" onClick={() => navigate('/app/authorize')}>
+            Authorize a spend first
+          </Button>
+        ) : (
+          <Button fullWidth size="lg" icon={<ScanEye size={15} />} onClick={attemptReveal} disabled={revealed}>
+            {revealed ? 'Revealed' : 'Reveal this transaction'}
+          </Button>
+        )}
       </Panel>
 
       {/* ── disclosure panel ── */}

@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight,
-  Lock, Zap, ShieldCheck, Users, ListChecks,
+  Lock, Zap, ShieldCheck, Users, ListChecks, Code2,
 } from 'lucide-react'
 import { AuthorizeReceipt } from '../components/AuthorizeReceipt'
 import { Button } from '../components/ui/Button'
 import { StatusChip } from '../components/ui/StatusChip'
+import { Logo } from '../components/ui/Logo'
 import type { ProofStage } from '../types/vault'
 
 /* ── demo ─────────────────────────────────────────────────── */
@@ -69,10 +70,10 @@ export function Landing() {
     <div className="fixed inset-0 bg-bg text-tx overflow-hidden flex flex-col">
 
       {/* ── top bar ── */}
-      <div className="flex-none flex items-center justify-between px-8 sm:px-12 h-16 z-30 relative">
-        <span className="text-[15px] font-bold text-tx tracking-tight">ciphermit</span>
-        <div className="flex items-center gap-3">
-          <StatusChip tone="dim" dot pulse>Stellar testnet</StatusChip>
+      <div className="flex-none flex items-center justify-between gap-3 px-6 sm:px-10 h-16 z-30 relative">
+        <Logo />
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="hidden sm:block"><StatusChip tone="dim" dot pulse>Stellar testnet</StatusChip></span>
           {isLast && (
             <Link to="/app">
               <Button size="sm">Launch app</Button>
@@ -111,7 +112,7 @@ export function Landing() {
         animate={{ opacity: isFirst ? 0 : 1, scale: isFirst ? 0.85 : 1 }}
         transition={{ duration: 0.2 }}
         style={{ pointerEvents: isFirst ? 'none' : 'auto' }}
-        className="fixed left-4 sm:left-6 top-1/2 -translate-y-1/2 z-40
+        className="fixed left-5 sm:left-8 top-1/2 -translate-y-1/2 z-40
                    w-12 h-12 sm:w-14 sm:h-14 rounded-full
                    bg-surface-2 border border-border
                    flex items-center justify-center text-tx2
@@ -127,7 +128,7 @@ export function Landing() {
         animate={{ opacity: isLast ? 0 : 1, scale: isLast ? 0.85 : 1 }}
         transition={{ duration: 0.2 }}
         style={{ pointerEvents: isLast ? 'none' : 'auto' }}
-        className="fixed right-4 sm:right-6 top-1/2 -translate-y-1/2 z-40
+        className="fixed right-5 sm:right-8 top-1/2 -translate-y-1/2 z-40
                    w-12 h-12 sm:w-14 sm:h-14 rounded-full
                    bg-surface-2 border border-border
                    flex items-center justify-center text-tx2
@@ -158,9 +159,12 @@ export function Landing() {
 function S0({ next }: SP) {
   return (
     <div className="relative w-full max-w-xl text-center">
-      {/* ambient */}
+      {/* ambient depth — layered radial glow + large blurred orb */}
       <div className="absolute -inset-40 pointer-events-none -z-10"
-        style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(46,230,197,0.09) 0%, transparent 65%)' }} />
+        style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 45%, rgba(46,230,197,0.12) 0%, transparent 62%)' }} />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[460px] h-[460px]
+                      rounded-full blur-[40px] pointer-events-none -z-10"
+        style={{ background: 'radial-gradient(circle, rgba(46,230,197,0.10) 0%, transparent 70%)' }} />
 
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -357,8 +361,15 @@ const POLICIES = [
 ]
 function S4(_: SP) {
   return (
-    <div className="w-full max-w-sm text-center">
-      <div className="space-y-8">
+    <motion.div
+      initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}
+      className="relative w-full max-w-lg"
+    >
+      {/* ambient glow behind the panel */}
+      <div className="absolute -inset-16 pointer-events-none -z-10"
+        style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 40%, rgba(46,230,197,0.10) 0%, transparent 65%)' }} />
+
+      <div className="panel panel-glow p-8 sm:p-10 text-center space-y-8">
         <div className="space-y-5">
           <motion.div
             initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -368,43 +379,46 @@ function S4(_: SP) {
           >
             <Lock size={26} className="text-accent" />
           </motion.div>
-          <div className="space-y-2">
-            <h2 className="text-[32px] font-extrabold text-tx tracking-tight">Ready to start?</h2>
-            <p className="text-[14px] text-tx2 leading-relaxed">
+          <div className="space-y-2.5">
+            <h2 className="text-[clamp(30px,3.5vw,38px)] font-extrabold text-tx tracking-tight">Ready to start?</h2>
+            <p className="text-[14px] text-tx2 leading-relaxed max-w-[400px] mx-auto">
               Open a vault on Stellar testnet. Connect Freighter or xBull —
               your keys never leave your browser.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-4">
           {POLICIES.map(p => (
             <div key={p.label}
-              className="flex items-center gap-2.5 bg-surface-2 border border-border rounded-xl px-3 py-3">
-              <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
-                <p.icon size={13} className="text-accent" />
+              className="flex items-center gap-3 bg-surface-2 border border-border rounded-xl px-4 py-3.5
+                         hover:border-border-s transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/15 flex items-center justify-center shrink-0">
+                <p.icon size={14} className="text-accent" />
               </div>
               <div className="text-left min-w-0">
-                <p className="text-[12px] font-bold text-tx leading-tight">{p.label}</p>
+                <p className="text-[12.5px] font-bold text-tx leading-tight">{p.label}</p>
                 <p className="text-[11px] text-tx3 leading-tight truncate">{p.desc}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="space-y-2.5">
-          <Link to="/app">
+        <div className="space-y-3">
+          <Link to="/app" className="block">
             <Button fullWidth size="lg">Connect wallet</Button>
           </Link>
-          <a href="https://github.com/Bosun-Josh121/ciphermit" target="_blank" rel="noreferrer">
-            <Button fullWidth size="md" variant="secondary">View source on GitHub</Button>
+          <a href="https://github.com/Bosun-Josh121/ciphermit" target="_blank" rel="noreferrer"
+            className="flex items-center justify-center gap-2 text-[13px] font-medium text-tx2 hover:text-tx
+                       transition-colors py-1">
+            <Code2 size={14} /> View source on GitHub
           </a>
         </div>
 
-        <p className="mono text-[10px] text-tx3">
+        <p className="mono text-[10px] text-tx3 pt-1">
           Stellar testnet · hackathon · Nethermind verifier
         </p>
       </div>
-    </div>
+    </motion.div>
   )
 }

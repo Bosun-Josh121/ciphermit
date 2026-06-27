@@ -11,6 +11,7 @@ import { signTransaction } from '../lib/wallet'
 import { randomHex32 } from '../lib/prover'
 import { useWallet } from '../lib/walletContext'
 import { useVaults } from '../lib/vaultsContext'
+import { useActivity } from '../lib/activityContext'
 import { POLICY_META } from '../lib/policyMeta'
 import { NETWORK } from '../lib/config'
 import type { PolicyType, VaultInfo } from '../types/vault'
@@ -44,8 +45,9 @@ const STEP_LABELS = ['Choose policy', 'Set rule & fund', 'Done']
 export function OpenVaultModal({
   onClose, onCreated,
 }: { onClose: () => void; onCreated: (v: VaultInfo) => void }) {
-  const { publicKey } = useWallet()
-  const { addVault }  = useVaults()
+  const { publicKey }   = useWallet()
+  const { addVault }    = useVaults()
+  const { addActivity } = useActivity()
 
   const [step,        setStep]        = useState<Step>(0)
   const [policy,      setPolicy]      = useState<PolicyType>('allowance')
@@ -95,7 +97,10 @@ export function OpenVaultModal({
           initialSpentCommitmentHex: spentCommitment, periodId,
         }), publicKey))
       setStatus('depositing')
-      await submitSigned(await signTransaction(await buildDepositTx(publicKey, vaultId, depositStroops), publicKey))
+      const depHash = await submitSigned(await signTransaction(await buildDepositTx(publicKey, vaultId, depositStroops), publicKey))
+
+      addActivity({ type: 'open',    vaultId, txHash: openHash })
+      addActivity({ type: 'deposit', vaultId, amount: depositStroops, txHash: depHash })
 
       sessionStorage.setItem(`vault_${vaultId}_secret`,            secret)
       sessionStorage.setItem(`vault_${vaultId}_blinding`,          blinding)
@@ -150,8 +155,8 @@ export function OpenVaultModal({
 
       {/* ══ Step 0: Policy selection ══ */}
       {step === 0 && (
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
             {POLICIES.map(type => {
               const meta   = POLICY_META[type]
               const active = policy === type
@@ -160,7 +165,7 @@ export function OpenVaultModal({
                   className={`relative flex flex-col items-start gap-3 text-left p-4 rounded-xl
                     border transition-all duration-150 group
                     ${active
-                      ? 'border-accent/50 bg-gradient-to-b from-accent/8 to-accent/3 shadow-[0_0_0_1px_rgba(46,230,197,0.12)]'
+                      ? 'border-accent/50 bg-gradient-to-b from-accent/10 to-accent/3 shadow-[0_0_0_1px_rgba(46,230,197,0.20),0_8px_32px_rgba(46,230,197,0.18)]'
                       : 'border-border bg-surface-2 hover:border-border-s hover:bg-surface-3'}`}>
                   {active && (
                     <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-accent

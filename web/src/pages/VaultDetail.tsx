@@ -1,243 +1,227 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Lock, ShieldCheck } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { AuthorizeReceipt } from '../components/AuthorizeReceipt'
+import { motion } from 'framer-motion'
+import { ArrowLeft, Lock, Plus, ArrowUpRight, Users, ScanEye, ShieldCheck } from 'lucide-react'
+import { Panel, EmptyState } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
-import { computeActionContext, proveAllowance, randomHex32 } from '../lib/prover'
-import { buildSpendTx, submitSigned } from '../lib/stellar'
-import { signTransaction } from '../lib/wallet'
-import { useWallet } from '../lib/walletContext'
+import { StatusChip } from '../components/ui/StatusChip'
+import { DataRow } from '../components/ui/DataRow'
+import { ActivityRow } from '../components/ActivityList'
+import { DepositModal } from '../components/DepositModal'
+import { useHeaderAction } from '../components/AppShell'
 import { useVaults } from '../lib/vaultsContext'
+import { useActivity, type ActivityRecord } from '../lib/activityContext'
+import { useDelegates } from '../lib/delegatesContext'
 import { POLICY_META } from '../lib/policyMeta'
-import type { ProofStage } from '../types/vault'
-import { NETWORK } from '../lib/config'
+import { xlm, truncAddr } from '../lib/format'
+import type { VaultInfo } from '../types/vault'
+
+type Tab = 'overview' | 'spends' | 'delegates' | 'settings'
 
 export function VaultDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { publicKey } = useWallet()
-  const { getVault, updateVault } = useVaults()
+  const { getVault } = useVaults()
+  const { forVault: activityFor } = useActivity()
+  const { forVault: delegatesFor } = useDelegates()
   const vault = getVault(Number(id))
 
-  const [recipient, setRecipient] = useState('')
-  const [amount,    setAmount]    = useState('')
-  const [stage,     setStage]     = useState<ProofStage>('idle')
-  const [txHash,    setTxHash]    = useState<string>()
-  const [errMsg,    setErrMsg]    = useState<string>()
+  const [tab, setTab] = useState<Tab>('overview')
+  const [showDeposit, setShowDeposit] = useState(false)
 
-  if (!vault || !publicKey) {
+  useHeaderAction(
+    vault ? { label: 'Authorize spend', icon: <ArrowUpRight size={14} />, onClick: () => navigate(`/app/authorize?vault=${vault.id}`) } : null,
+    [vault?.id],
+  )
+
+  if (!vault) {
     return (
-      <div className="max-w-md mx-auto pt-8 space-y-4">
-        <BackButton navigate={navigate} />
-        <div className="bg-surface border border-border rounded-2xl p-10 text-center space-y-2">
-          <p className="text-[16px] font-bold text-tx">Vault not found</p>
-          <p className="text-[14px] text-tx2">
-            This vault wasn&apos;t opened in your current session.
-          </p>
-        </div>
+      <div className="space-y-4">
+        <BackLink navigate={navigate} />
+        <Panel glow>
+          <EmptyState
+            icon={<Lock size={24} className="text-accent" />}
+            title="Vault not found"
+            desc="This vault wasn’t opened in your current session. Vault secrets live in session storage for privacy."
+            action={<Button variant="secondary" onClick={() => navigate('/app/vaults')}>All vaults</Button>}
+          />
+        </Panel>
       </div>
     )
   }
 
-  const meta       = POLICY_META[vault.policyType]
-  const xlm        = (Number(vault.balance) / 1e7).toFixed(2)
-  const explorerUrl = txHash
-    ? `https://stellar.expert/explorer/${NETWORK}/tx/${txHash}` : undefined
-  const busy = stage === 'building' || stage === 'verifying'
-  const done = stage === 'authorized'
+  const meta = POLICY_META[vault.policyType]
+  const spends = activityFor(vault.id)
+  const delegates = delegatesFor(vault.id)
 
-  async function handleAuthorize() {
-    setErrMsg(undefined); setStage('building')
-    try {
-      const stroops = BigInt(Math.round(parseFloat(amount) * 1e7))
-      if (stroops <= 0n) throw new Error('Amount must be positive.')
-      const secret      = sessionStorage.getItem(`vault_${vault!.id}_secret`)      ?? randomHex32()
-      const periodCap   = BigInt(sessionStorage.getItem(`vault_${vault!.id}_period_cap`) ?? '1000000000')
-      const actionCtx   = await computeActionContext(vault!.owner, recipient, stroops)
-      const proof       = await proveAllowance({
-        vault_secret_hex: secret, spend_amount: Number(stroops), prior_spent: 0,
-        period_cap: Number(periodCap), period_id: Number(vault!.periodId),
-        nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(),
-        action_context_hex: actionCtx,
-      })
-      setStage('verifying')
-      const hash = await submitSigned(await signTransaction(await buildSpendTx({
-        vaultId: vault!.id, owner: publicKey!, to: recipient, amount: stroops,
-        sealHex: proof.seal, journalDigestHex: proof.journal_digest,
-        policyCommitmentHex: vault!.policyCommitment,
-        newSpentCommitmentHex: proof.new_spent_commitment,
-        nullifierHex: proof.nullifier, actionContextHex: proof.action_context,
-      }), publicKey!))
-      sessionStorage.setItem(`vault_${vault!.id}_spent_commitment`, proof.new_spent_commitment)
-      updateVault(vault!.id, {
-        balance: vault!.balance - stroops,
-        spentCommitment: proof.new_spent_commitment,
-      })
-      setTxHash(hash); setStage('authorized')
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setErrMsg(msg.length > 120
-        ? 'Spend exceeds private limit, or the proof was rejected by the vault.' : msg)
-      setStage('failed')
-    }
-  }
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'spends', label: 'Spends' },
+    ...(vault.policyType === 'delegation' ? [{ key: 'delegates' as Tab, label: 'Delegates' }] : []),
+    { key: 'settings', label: 'Settings' },
+  ]
 
   return (
-    <div className="max-w-md mx-auto py-6 space-y-5">
-      <BackButton navigate={navigate} />
+    <div className="space-y-6">
+      <BackLink navigate={navigate} />
 
-      {/* ── Vault info card ── */}
-      <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-accent via-accent to-accent/30" />
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/15
-                            flex items-center justify-center shrink-0">
-              <meta.icon size={16} className="text-accent" />
+      {/* header */}
+      <Panel glow className="overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-accent via-accent to-accent/20 -mx-px -mt-px rounded-t-2xl" />
+        <div className="p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
+              <meta.icon size={20} className="text-accent" />
             </div>
             <div>
-              <p className="text-[15px] font-extrabold text-tx">{meta.label} vault</p>
-              <p className="mono text-[11px] text-tx3">#{vault.id} · Period {vault.periodId.toString()}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[18px] font-extrabold text-tx">{meta.label} vault</p>
+                <StatusChip tone="accent" dot>Active</StatusChip>
+              </div>
+              <p className="mono text-[11px] text-tx3 mt-0.5">#{vault.id} · period {vault.periodId.toString()}</p>
             </div>
           </div>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-[11px] text-tx3 uppercase tracking-wide font-medium mb-1.5">
-                Available balance
-              </p>
-              <p className="mono text-[32px] font-extrabold text-tx leading-none">
-                {xlm}
-                <span className="mono text-[16px] text-tx3 font-normal ml-1.5">XLM</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 text-[12px] text-tx3 pb-1">
-              <Lock size={11} /> Limit private
-            </div>
+          <div className="sm:text-right">
+            <p className="text-[10px] text-tx3 uppercase tracking-wide font-semibold mb-1">Escrow balance</p>
+            <p className="mono text-[32px] font-extrabold text-tx leading-none tracking-tight">
+              {xlm(vault.balance)}<span className="text-[15px] text-tx3 font-normal ml-1.5">XLM</span>
+            </p>
           </div>
         </div>
+      </Panel>
+
+      {/* tabs */}
+      <div className="flex items-center gap-1 border-b border-border">
+        {TABS.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`relative px-4 py-2.5 text-[13px] font-semibold transition-colors
+              ${tab === t.key ? 'text-tx' : 'text-tx3 hover:text-tx2'}`}>
+            {t.label}
+            {tab === t.key && <motion.span layoutId="tab-underline" className="absolute left-0 right-0 -bottom-px h-0.5 bg-accent rounded-full" />}
+          </button>
+        ))}
       </div>
 
-      {/* ── Form / Receipt ── */}
-      <AnimatePresence mode="wait">
-        {stage === 'idle' && (
-          <motion.div key="form"
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}>
-            <TransferForm
-              recipient={recipient} amount={amount}
-              setRecipient={setRecipient} setAmount={setAmount}
-              onSubmit={handleAuthorize}
-            />
-          </motion.div>
-        )}
+      {/* tab content */}
+      {tab === 'overview'  && <OverviewTab vault={vault} onDeposit={() => setShowDeposit(true)} onSpend={() => navigate(`/app/authorize?vault=${vault.id}`)} />}
+      {tab === 'spends'    && <SpendsTab spends={spends} onSpend={() => navigate(`/app/authorize?vault=${vault.id}`)} />}
+      {tab === 'delegates' && <DelegatesTab count={delegates.length} navigate={navigate} />}
+      {tab === 'settings'  && <SettingsTab vault={vault} navigate={navigate} />}
 
-        {stage !== 'idle' && (
-          <motion.div key="receipt"
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="space-y-3">
-            <div className="bg-surface-2 border border-border rounded-[20px] p-6 shadow-[var(--shadow-float)]">
-              <AuthorizeReceipt
-                stage={stage} recipient={recipient} amount={amount}
-                txHash={txHash} explorerUrl={explorerUrl} errorReason={errMsg}
-              />
-            </div>
-
-            {(done || stage === 'failed') && (
-              <Button variant={done ? 'secondary' : 'ghost'} fullWidth
-                onClick={done ? () => navigate('/app') : () => setStage('idle')}>
-                {done ? 'Back to vaults' : 'Try again'}
-              </Button>
-            )}
-
-            {busy && (
-              <p className="text-center text-[12px] text-tx3 font-medium">
-                Watching the chain…
-              </p>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {showDeposit && <DepositModal vault={vault} onClose={() => setShowDeposit(false)} />}
     </div>
   )
 }
 
-/* ── Transfer form ─────────────────────────────────────── */
-function TransferForm({
-  recipient, amount, setRecipient, setAmount, onSubmit,
-}: {
-  recipient: string; amount: string
-  setRecipient: (v: string) => void; setAmount: (v: string) => void
-  onSubmit: () => void
-}) {
-  const canSubmit = recipient.trim().length > 0 && parseFloat(amount) > 0
-
+/* ── Overview tab ── */
+function OverviewTab({ vault, onDeposit, onSpend }: { vault: VaultInfo; onDeposit: () => void; onSpend: () => void }) {
+  const meta = POLICY_META[vault.policyType]
   return (
-    <div className="bg-surface border border-border rounded-2xl p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-[17px] font-extrabold text-tx">New transfer</h2>
-        <div className="flex items-center gap-1.5 text-[12px] text-accent font-medium">
-          <ShieldCheck size={13} /> ZK-proven
+    <div className="grid lg:grid-cols-2 gap-6">
+      <Panel className="p-6 space-y-4">
+        <h3 className="text-[14px] font-extrabold text-tx">Policy</h3>
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/15 flex items-center justify-center shrink-0">
+            <meta.icon size={15} className="text-accent" />
+          </div>
+          <div>
+            <p className="text-[13px] font-bold text-tx">{meta.label}</p>
+            <p className="text-[12px] text-tx2 leading-snug mt-0.5">{meta.desc}</p>
+          </div>
         </div>
-      </div>
-
-      {/* Recipient */}
-      <div className="space-y-2">
-        <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">
-          Recipient address
-        </label>
-        <input
-          value={recipient} onChange={e => setRecipient(e.target.value)}
-          placeholder="G…"
-          className="w-full mono text-[13px] bg-surface-2 border border-border rounded-xl
-                     px-4 py-3.5 text-tx placeholder:text-tx3
-                     focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/20
-                     transition-all"
-        />
-      </div>
-
-      {/* Amount */}
-      <div className="space-y-2">
-        <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">
-          Amount
-        </label>
-        <div className="relative">
-          <input
-            type="number" min="0" step="0.01" value={amount}
-            onChange={e => setAmount(e.target.value)}
-            placeholder="0.00"
-            className="w-full mono text-[28px] font-extrabold bg-surface-2 border border-border
-                       rounded-xl px-4 py-4 pr-20 text-tx placeholder:text-tx3
-                       focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/20
-                       transition-all"
-          />
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 mono text-[14px]
-                           font-bold text-tx3">
-            XLM
-          </span>
+        <div className="bg-surface-2 border border-border rounded-xl px-4 py-3 flex items-center justify-between">
+          <span className="text-[12px] text-tx2 flex items-center gap-2"><Lock size={12} className="text-accent" /> Period limit</span>
+          <span className="mono text-[12px] text-tx3">private · committed</span>
         </div>
-      </div>
+      </Panel>
 
-      {/* Privacy note */}
-      <div className="flex items-start gap-3 bg-accent/5 border border-accent/15 rounded-xl px-4 py-3">
-        <Lock size={13} className="text-accent mt-0.5 shrink-0" />
+      <Panel className="p-6 space-y-4">
+        <h3 className="text-[14px] font-extrabold text-tx">Actions</h3>
         <p className="text-[12px] text-tx2 leading-relaxed">
-          Your spending limit is never revealed. A zero-knowledge proof confirms
-          this transfer is within it before the vault releases funds.
+          Add escrow to this vault, or authorize a spend with a zero-knowledge proof of your private rule.
         </p>
-      </div>
-
-      <Button fullWidth size="lg" disabled={!canSubmit} onClick={onSubmit}>
-        Authorize transfer
-      </Button>
+        <div className="flex gap-3 pt-1">
+          <Button fullWidth icon={<ArrowUpRight size={15} />} onClick={onSpend}>Authorize spend</Button>
+          <Button variant="secondary" icon={<Plus size={15} />} onClick={onDeposit}>Deposit</Button>
+        </div>
+      </Panel>
     </div>
   )
 }
 
-/* ── Back button ───────────────────────────────────────── */
-function BackButton({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
+/* ── Spends tab ── */
+function SpendsTab({ spends, onSpend }: { spends: ActivityRecord[]; onSpend: () => void }) {
+  const onlySpends = spends.filter(s => s.type === 'spend')
+  if (onlySpends.length === 0) {
+    return (
+      <Panel glow>
+        <EmptyState icon={<ArrowUpRight size={22} className="text-accent" />}
+          title="No spends yet" desc="Authorized spends from this vault will appear here with their on-chain transaction."
+          action={<Button onClick={onSpend}>Authorize a spend</Button>} />
+      </Panel>
+    )
+  }
   return (
-    <button onClick={() => navigate('/app')}
+    <Panel className="px-5">
+      <div className="divide-y divide-border">
+        {onlySpends.map(rec => <ActivityRow key={rec.id} rec={rec} />)}
+      </div>
+    </Panel>
+  )
+}
+
+/* ── Delegates tab ── */
+function DelegatesTab({ count, navigate }: { count: number; navigate: ReturnType<typeof useNavigate> }) {
+  return (
+    <Panel className="p-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/15 flex items-center justify-center">
+            <Users size={17} className="text-accent" />
+          </div>
+          <div>
+            <p className="text-[14px] font-extrabold text-tx">{count} delegate{count !== 1 ? 's' : ''}</p>
+            <p className="text-[12px] text-tx2">Capped, revocable, private sub-allowances.</p>
+          </div>
+        </div>
+        <Button variant="secondary" onClick={() => navigate('/app/delegates')}>Manage delegates</Button>
+      </div>
+    </Panel>
+  )
+}
+
+/* ── Settings tab ── */
+function SettingsTab({ vault, navigate }: { vault: VaultInfo; navigate: ReturnType<typeof useNavigate> }) {
+  return (
+    <div className="grid lg:grid-cols-2 gap-6">
+      <Panel className="p-6 space-y-1">
+        <h3 className="text-[14px] font-extrabold text-tx mb-3">Cryptographic config</h3>
+        <DataRow label="Period id" value={vault.periodId.toString()} />
+        <DataRow label="Policy commitment" value={vault.policyCommitment} copyable truncateMiddle />
+        <DataRow label="Spent commitment" value={vault.spentCommitment} copyable truncateMiddle />
+        <DataRow label="Owner" value={truncAddr(vault.owner, 8, 6)} />
+      </Panel>
+      <Panel className="p-6 space-y-4">
+        <h3 className="text-[14px] font-extrabold text-tx">View-key disclosure</h3>
+        <p className="text-[12px] text-tx2 leading-relaxed">
+          Reveal a single transaction from this vault to an auditor without exposing the rest, using the vault’s view key.
+        </p>
+        <Button variant="secondary" icon={<ScanEye size={15} />} onClick={() => navigate('/app/audit')}>Open audit</Button>
+        <div className="flex items-start gap-2.5 bg-surface-2 border border-border rounded-xl px-4 py-3 mt-2">
+          <ShieldCheck size={14} className="text-accent mt-0.5 shrink-0" />
+          <p className="text-[12px] text-tx2 leading-relaxed">
+            Spend limits and recipients stay private on-chain — only commitments and proofs are published.
+          </p>
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+/* ── helpers ── */
+function BackLink({ navigate }: { navigate: ReturnType<typeof useNavigate> }) {
+  return (
+    <button onClick={() => navigate('/app/vaults')}
       className="flex items-center gap-1.5 text-[13px] text-tx3 hover:text-tx transition-colors">
       <ArrowLeft size={14} /> All vaults
     </button>

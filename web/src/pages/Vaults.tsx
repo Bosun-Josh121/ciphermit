@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import { VaultCard } from '../components/VaultCard'
-import { VaultsEmptyGrid } from '../components/VaultsEmpty'
+import { VaultsEmptyHero } from '../components/VaultsEmpty'
 import { OpenVaultModal } from '../components/OpenVaultModal'
 import { DepositModal } from '../components/DepositModal'
 import { useHeaderAction } from '../components/AppShell'
@@ -28,7 +28,7 @@ export function Vaults() {
       </p>
 
       {vaults.length === 0 ? (
-        <VaultsEmptyGrid onOpen={() => setShowOpen(true)} />
+        <VaultsEmptyHero onOpen={() => setShowOpen(true)} />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {vaults.map((v, i) => (

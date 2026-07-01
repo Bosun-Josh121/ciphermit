@@ -165,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </AnimatePresence>
 
         {/* ── main column ── */}
-        <div className="flex-1 min-w-0 flex flex-col relative">
+        <div className="flex-1 min-w-0 flex flex-col relative overflow-x-hidden">
 
           {/* page background depth — never a flat black void */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -175,31 +175,34 @@ export function AppShell({ children }: { children: ReactNode }) {
               style={{ background: 'radial-gradient(circle, rgba(46,230,197,0.035) 0%, transparent 70%)' }} />
           </div>
 
-          {/* top bar */}
-          <header className="relative z-10 shrink-0">
-            <div className="flex items-center gap-4 px-6 sm:px-8 lg:px-10 h-16">
-              <button onClick={() => setDrawer(true)}
-                className="lg:hidden text-tx2 hover:text-tx p-1 -ml-1">
-                <Menu size={20} />
-              </button>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-[19px] sm:text-[21px] font-extrabold text-tx tracking-tight leading-tight truncate">
-                  {meta.title}
-                </h1>
-                <p className="text-[12px] sm:text-[13px] text-tx2 truncate hidden sm:block">{meta.subtitle}</p>
+          {/* top bar — inner constrained to the SAME column as content so the
+              primary action always sits above content, never at a clipped edge */}
+          <header className="relative z-10 shrink-0 px-6 sm:px-8 lg:px-10">
+            <div className="w-full max-w-[1160px] mx-auto">
+              <div className="flex items-center gap-4 h-16">
+                <button onClick={() => setDrawer(true)}
+                  className="lg:hidden text-tx2 hover:text-tx p-1 -ml-1">
+                  <Menu size={20} />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-[19px] sm:text-[21px] font-extrabold text-tx tracking-tight leading-tight truncate">
+                    {meta.title}
+                  </h1>
+                  <p className="text-[12px] sm:text-[13px] text-tx2 truncate hidden sm:block">{meta.subtitle}</p>
+                </div>
+                {action && (
+                  <Button size="sm" icon={action.icon} onClick={action.onClick} className="shrink-0">
+                    {action.label}
+                  </Button>
+                )}
               </div>
-              {action && (
-                <Button size="sm" icon={action.icon} onClick={action.onClick} className="shrink-0">
-                  {action.label}
-                </Button>
-              )}
+              <div className="h-px bg-border/70" />
             </div>
-            <div className="h-px bg-border/70 mx-6 sm:mx-8 lg:mx-10" />
           </header>
 
           {/* content */}
           <main className="relative z-10 flex-1 px-6 sm:px-8 lg:px-10 py-8 lg:py-10">
-            <div className="max-w-[1120px] w-full">
+            <div className="w-full max-w-[1160px] mx-auto">
               {children}
             </div>
           </main>

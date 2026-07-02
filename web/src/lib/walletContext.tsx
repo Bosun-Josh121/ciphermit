@@ -35,7 +35,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const m = errMessage(e)
       setError(
         /not.*installed|no.*wallet|not.*found|undefined/i.test(m)
-          ? 'That wallet isn’t available. Install its extension, or try Albedo (works in-browser, no extension).'
+          ? 'That wallet isn’t available — make sure its extension is installed and unlocked, or pick another wallet.'
           : m,
       )
     } finally {

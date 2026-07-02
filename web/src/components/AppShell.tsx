@@ -219,10 +219,10 @@ const FEATURES = [
   { icon: Zap,         title: 'ZK proofs',      desc: 'Your device proves the spend is valid without revealing the rule.' },
   { icon: ShieldCheck, title: 'Stellar native', desc: 'Vault verification happens on Stellar Soroban, fully on-chain.' },
 ]
-const WALLETS = [
-  { id: WALLET_IDS.albedo,    name: 'Albedo',    desc: 'Web-based · no extension needed', initial: 'A', tag: 'Easiest' },
-  { id: WALLET_IDS.freighter, name: 'Freighter', desc: 'Browser extension',               initial: 'F' },
-  { id: WALLET_IDS.xbull,     name: 'xBull',     desc: 'Extension or web app',             initial: 'x' },
+const WALLETS: { id: string; name: string; desc: string; initial: string; tag?: string }[] = [
+  { id: WALLET_IDS.freighter, name: 'Freighter', desc: 'Browser extension',        initial: 'F' },
+  { id: WALLET_IDS.xbull,     name: 'xBull',     desc: 'Extension or web app',      initial: 'x' },
+  { id: WALLET_IDS.albedo,    name: 'Albedo',    desc: 'Web-based, no extension',   initial: 'A' },
 ]
 
 export function ConnectGate({ children }: { children: ReactNode }) {

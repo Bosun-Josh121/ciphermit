@@ -51,11 +51,18 @@ export function Authorize() {
     try {
       const stroops = BigInt(Math.round(parseFloat(amount) * 1e7))
       if (stroops <= 0n) throw new Error('Amount must be positive.')
-      const secret    = sessionStorage.getItem(`vault_${vault.id}_secret`) ?? randomHex32()
-      const periodCap = BigInt(sessionStorage.getItem(`vault_${vault.id}_period_cap`) ?? '1000000000')
+      const secret     = sessionStorage.getItem(`vault_${vault.id}_secret`) ?? randomHex32()
+      const periodCap  = BigInt(sessionStorage.getItem(`vault_${vault.id}_period_cap`) ?? '1000000000')
+      // running total already spent this period — makes the cap cumulative,
+      // not per-transaction. The proof enforces spend <= cap - priorSpent.
+      const priorSpent = BigInt(sessionStorage.getItem(`vault_${vault.id}_prior_spent`) ?? '0')
+      const remaining  = periodCap > priorSpent ? periodCap - priorSpent : 0n
+      if (stroops > remaining) {
+        throw new Error(`Spend exceeds the remaining period allowance — ${xlm(remaining)} XLM left this period.`)
+      }
       const actionCtx = await computeActionContext(vault.owner, recipient, stroops)
       const proof = await proveAllowance({
-        vault_secret_hex: secret, spend_amount: Number(stroops), prior_spent: 0,
+        vault_secret_hex: secret, spend_amount: Number(stroops), prior_spent: Number(priorSpent),
         period_cap: Number(periodCap), period_id: Number(vault.periodId),
         nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(),
         action_context_hex: actionCtx,
@@ -69,6 +76,7 @@ export function Authorize() {
         nullifierHex: proof.nullifier, actionContextHex: proof.action_context,
       }), publicKey))
       sessionStorage.setItem(`vault_${vault.id}_spent_commitment`, proof.new_spent_commitment)
+      sessionStorage.setItem(`vault_${vault.id}_prior_spent`, (priorSpent + stroops).toString())
       updateVault(vault.id, { balance: vault.balance - stroops, spentCommitment: proof.new_spent_commitment })
       addActivity({ type: 'spend', vaultId: vault.id, amount: stroops, counterparty: recipient, txHash: hash })
       setTxHash(hash); setStage('authorized')

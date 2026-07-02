@@ -12,7 +12,7 @@ import { useWallet } from '../lib/walletContext'
 import { useVaults } from '../lib/vaultsContext'
 import { useActivity } from '../lib/activityContext'
 import { POLICY_META } from '../lib/policyMeta'
-import { xlm } from '../lib/format'
+import { xlm, errMessage } from '../lib/format'
 import { NETWORK } from '../lib/config'
 import type { ProofStage, VaultInfo } from '../types/vault'
 
@@ -73,8 +73,13 @@ export function Authorize() {
       addActivity({ type: 'spend', vaultId: vault.id, amount: stroops, counterparty: recipient, txHash: hash })
       setTxHash(hash); setStage('authorized')
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setErrMsg(msg.length > 120 ? 'Spend exceeds private limit, or the proof was rejected by the vault.' : msg)
+      console.error('Authorize failed:', e)
+      const msg = errMessage(e)
+      // Real on-chain verify rejection -> friendly; everything else shows the truth.
+      const friendly = /Error\(Contract/.test(msg) || msg.includes('VM trap')
+        ? 'The vault rejected the spend — the proof or rule did not match.'
+        : msg
+      setErrMsg(friendly.length > 200 ? friendly.slice(0, 200) + '…' : friendly)
       setStage('failed')
     }
   }

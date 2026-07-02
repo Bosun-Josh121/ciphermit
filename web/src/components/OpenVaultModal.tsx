@@ -13,6 +13,7 @@ import { useWallet } from '../lib/walletContext'
 import { useVaults } from '../lib/vaultsContext'
 import { useActivity } from '../lib/activityContext'
 import { POLICY_META } from '../lib/policyMeta'
+import { errMessage } from '../lib/format'
 import { NETWORK } from '../lib/config'
 import type { PolicyType, VaultInfo } from '../types/vault'
 import sha256 from '../lib/sha256'
@@ -114,7 +115,8 @@ export function OpenVaultModal({
       }
       addVault(vault); setCreated(vault); setTxHash(openHash); setStatus('idle'); setStep(2)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
+      console.error('Open vault failed:', e)
+      setError(errMessage(e))
       setStatus('idle')
     }
   }

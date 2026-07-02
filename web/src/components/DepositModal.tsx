@@ -11,7 +11,7 @@ import { useActivity } from '../lib/activityContext'
 import { getVaultBalance } from '../lib/stellar'
 import { NETWORK } from '../lib/config'
 import { POLICY_META } from '../lib/policyMeta'
-import { xlm } from '../lib/format'
+import { xlm, errMessage } from '../lib/format'
 import type { VaultInfo } from '../types/vault'
 
 type Status = 'idle' | 'approving' | 'depositing' | 'done'
@@ -43,7 +43,8 @@ export function DepositModal({ vault, onClose }: { vault: VaultInfo; onClose: ()
       addActivity({ type: 'deposit', vaultId: vault.id, amount: stroops, txHash: hash })
       setTxHash(hash); setStatus('done')
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
+      console.error('Deposit failed:', e)
+      setError(errMessage(e))
       setStatus('idle')
     }
   }

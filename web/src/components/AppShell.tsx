@@ -5,10 +5,11 @@ import {
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutGrid, Wallet, Zap, Users, ScanEye, Activity as ActivityIcon,
-  LogOut, Lock, ShieldCheck, ChevronRight, Menu, X,
+  LogOut, Lock, ShieldCheck, ChevronRight, Menu, X, Loader2,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '../lib/walletContext'
+import { WALLET_IDS } from '../lib/wallet'
 import { NETWORK } from '../lib/config'
 import { Button } from './ui/Button'
 
@@ -219,12 +220,13 @@ const FEATURES = [
   { icon: ShieldCheck, title: 'Stellar native', desc: 'Vault verification happens on Stellar Soroban, fully on-chain.' },
 ]
 const WALLETS = [
-  { name: 'Freighter', desc: 'Official Stellar browser extension', initial: 'F' },
-  { name: 'xBull',     desc: 'Multi-account Stellar wallet',       initial: 'x' },
+  { id: WALLET_IDS.albedo,    name: 'Albedo',    desc: 'Web-based · no extension needed', initial: 'A', tag: 'Easiest' },
+  { id: WALLET_IDS.freighter, name: 'Freighter', desc: 'Browser extension',               initial: 'F' },
+  { id: WALLET_IDS.xbull,     name: 'xBull',     desc: 'Extension or web app',             initial: 'x' },
 ]
 
 export function ConnectGate({ children }: { children: ReactNode }) {
-  const { publicKey, connecting, error, connect } = useWallet()
+  const { publicKey, connecting, connectingId, error, connect, clearError } = useWallet()
   if (publicKey) return <>{children}</>
 
   return (
@@ -278,33 +280,44 @@ export function ConnectGate({ children }: { children: ReactNode }) {
           </div>
           <div className="space-y-2">
             <h1 className="text-[28px] font-extrabold text-tx tracking-tight">Connect wallet</h1>
-            <p className="text-[14px] text-tx2 leading-relaxed">Choose your Stellar wallet to get started. Your keys stay local.</p>
+            <p className="text-[14px] text-tx2 leading-relaxed">Pick a wallet to get started. Your keys stay in your browser.</p>
           </div>
           <div className="space-y-2.5">
-            {WALLETS.map((w, i) => (
-              <motion.div key={w.name}
-                initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
-                className="flex items-center gap-4 bg-surface-2 border border-border rounded-2xl px-5 py-4 hover:border-border-s transition-colors cursor-default">
-                <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/15 flex items-center justify-center shrink-0">
-                  <span className="text-[16px] font-extrabold text-accent">{w.initial}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-bold text-tx">{w.name}</p>
-                  <p className="text-[12px] text-tx3">{w.desc}</p>
-                </div>
-                <ChevronRight size={16} className="text-border-s shrink-0" />
-              </motion.div>
-            ))}
+            {WALLETS.map((w, i) => {
+              const busy = connectingId === w.id
+              return (
+                <motion.button key={w.id} type="button" disabled={connecting} onClick={() => connect(w.id)}
+                  initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
+                  className="w-full flex items-center gap-4 bg-surface-2 border border-border rounded-2xl px-5 py-4 text-left
+                             hover:border-accent/40 hover:bg-surface-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/15 flex items-center justify-center shrink-0">
+                    <span className="text-[16px] font-extrabold text-accent">{w.initial}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[14px] font-bold text-tx">{w.name}</p>
+                      {w.tag && <span className="text-[10px] font-bold text-accent bg-accent/10 border border-accent/20 rounded-full px-2 py-0.5">{w.tag}</span>}
+                    </div>
+                    <p className="text-[12px] text-tx3">{w.desc}</p>
+                  </div>
+                  {busy
+                    ? <Loader2 size={16} className="text-accent animate-spin shrink-0" />
+                    : <ChevronRight size={16} className="text-border-s shrink-0" />}
+                </motion.button>
+              )
+            })}
           </div>
           <div className="space-y-4">
-            <Button fullWidth size="lg" loading={connecting} onClick={() => connect()}>
-              {connecting ? 'Connecting…' : 'Connect wallet'}
-            </Button>
             {error && (
-              <div className="bg-reject/8 border border-reject/25 rounded-xl px-4 py-3">
-                <p className="mono text-[12px] text-reject leading-snug">{error}</p>
+              <div className="flex items-start gap-2.5 bg-reject/8 border border-reject/25 rounded-xl px-4 py-3">
+                <p className="text-[12px] text-reject leading-snug flex-1">{error}</p>
+                <button onClick={clearError} className="text-reject/60 hover:text-reject shrink-0 -mt-0.5"><X size={13} /></button>
               </div>
             )}
+            <button onClick={() => connect()} disabled={connecting}
+              className="w-full text-center text-[12px] text-tx3 hover:text-tx transition-colors disabled:opacity-50">
+              Or choose from all wallets →
+            </button>
             <p className="text-center text-[12px] text-tx3 leading-relaxed">
               Your keys never leave your browser.{' '}
               <Link to="/" className="text-accent hover:underline">← Back to overview</Link>

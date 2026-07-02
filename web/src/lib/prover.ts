@@ -31,7 +31,8 @@ export async function proveAllowance(req: AllowanceProveRequest): Promise<ProofR
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error ?? 'Proof generation failed')
+    const m = typeof err.error === 'string' ? err.error : JSON.stringify(err.error)
+    throw new Error(m || `Proof generation failed (HTTP ${res.status})`)
   }
   return res.json()
 }

@@ -1,3 +1,18 @@
+/** Extract a human-readable message from any thrown value (Error, wallet-kit
+ *  object, {error}, etc.) — avoids the useless "[object Object]". */
+export function errMessage(e: unknown): string {
+  if (e == null) return 'Unknown error'
+  if (typeof e === 'string') return e
+  if (e instanceof Error) return e.message
+  if (typeof e === 'object') {
+    const o = e as Record<string, unknown>
+    if (typeof o.message === 'string') return o.message
+    if (typeof o.error === 'string') return o.error
+    try { return JSON.stringify(e) } catch { return String(e) }
+  }
+  return String(e)
+}
+
 export function xlm(stroops: bigint | number): string {
   const n = typeof stroops === 'bigint' ? Number(stroops) : stroops
   return (n / 1e7).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

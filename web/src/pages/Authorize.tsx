@@ -5,7 +5,8 @@ import { ChevronDown, Lock, ShieldCheck, Info, Check } from 'lucide-react'
 import { Panel, EmptyState } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
 import { AuthorizeReceipt } from '../components/AuthorizeReceipt'
-import { computeActionContext, proveAllowance, randomHex32 } from '../lib/prover'
+import { computeActionContext, proveAllowance, proveAllowlist, randomHex32, type ProofResponse } from '../lib/prover'
+import { allowlistMembershipProof } from '../lib/merkle'
 import { buildSpendTx, submitSigned } from '../lib/stellar'
 import { signTransaction } from '../lib/wallet'
 import { useWallet } from '../lib/walletContext'
@@ -41,7 +42,7 @@ export function Authorize() {
   const [dropOpen, setDropOpen]   = useState(false)
 
   const busy = stage === 'building' || stage === 'verifying'
-  const supported = vault?.policyType === 'allowance' // real prover path
+  const supported = vault?.policyType === 'allowance' || vault?.policyType === 'allowlist' // wired prover paths
   const canSubmit = !!vault && supported && recipient.trim().length > 0 && parseFloat(amount) > 0 && !busy
   const explorerUrl = txHash ? `https://stellar.expert/explorer/${NETWORK}/tx/${txHash}` : undefined
 
@@ -61,12 +62,26 @@ export function Authorize() {
         throw new Error(`Spend exceeds the remaining period allowance — ${xlm(remaining)} XLM left this period.`)
       }
       const actionCtx = await computeActionContext(vault.owner, recipient, stroops)
-      const proof = await proveAllowance({
-        vault_secret_hex: secret, spend_amount: Number(stroops), prior_spent: Number(priorSpent),
-        period_cap: Number(periodCap), period_id: Number(vault.periodId),
-        nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(),
-        action_context_hex: actionCtx,
-      })
+      let proof: ProofResponse
+      if (vault.policyType === 'allowlist') {
+        const members: string[] = JSON.parse(sessionStorage.getItem(`vault_${vault.id}_allowlist_members`) ?? '[]')
+        const m = await allowlistMembershipProof(members, recipient) // throws if recipient not in the set
+        proof = await proveAllowlist({
+          vault_secret_hex: secret, recipient_hex: m.recipientHex, set_root_hex: m.setRootHex,
+          proof_hex: m.proofHex, path_bits: m.pathBits,
+          spend_amount: Number(stroops), prior_spent: Number(priorSpent),
+          period_cap: Number(periodCap), period_id: Number(vault.periodId),
+          nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(),
+          action_context_hex: actionCtx,
+        })
+      } else {
+        proof = await proveAllowance({
+          vault_secret_hex: secret, spend_amount: Number(stroops), prior_spent: Number(priorSpent),
+          period_cap: Number(periodCap), period_id: Number(vault.periodId),
+          nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(),
+          action_context_hex: actionCtx,
+        })
+      }
       setStage('verifying')
       const hash = await submitSigned(await signTransaction(await buildSpendTx({
         vaultId: vault.id, owner: publicKey, to: recipient, amount: stroops,

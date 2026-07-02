@@ -14,6 +14,7 @@ import { useVaults } from '../lib/vaultsContext'
 import { useActivity } from '../lib/activityContext'
 import { POLICY_META } from '../lib/policyMeta'
 import { errMessage } from '../lib/format'
+import { allowlistRoot, allowlistCommitment, bytesToHex } from '../lib/merkle'
 import { NETWORK } from '../lib/config'
 import type { PolicyType, VaultInfo } from '../types/vault'
 import sha256 from '../lib/sha256'
@@ -53,6 +54,7 @@ export function OpenVaultModal({
   const [step,        setStep]        = useState<Step>(0)
   const [policy,      setPolicy]      = useState<PolicyType>('allowance')
   const [periodCap,   setPeriodCap]   = useState('')
+  const [allowlist,   setAllowlist]   = useState('')
   const [deposit,     setDeposit]     = useState('')
   const [status,      setStatus]      = useState<Status>('idle')
   const [error,       setError]       = useState<string>()
@@ -80,11 +82,28 @@ export function OpenVaultModal({
     try {
       const depositStroops = BigInt(Math.round(parseFloat(deposit) * 1e7))
       if (depositStroops <= 0n) throw new Error('Enter a positive amount.')
-      const capStroops = policy === 'allowance' && periodCap
+      const capStroops = (policy === 'allowance' || policy === 'allowlist') && periodCap
         ? BigInt(Math.round(parseFloat(periodCap) * 1e7)) : depositStroops * 10n
       const periodId = 1n
       const secret = randomHex32(), blinding = randomHex32()
-      const policyCommitment = await deriveCommitment(secret, capStroops, periodId)
+
+      // policy commitment is derived differently per policy
+      let policyCommitment: string
+      let allowlistMembers: string[] | undefined
+      let allowlistRootHex: string | undefined
+      if (policy === 'allowance') {
+        policyCommitment = await deriveCommitment(secret, capStroops, periodId)
+      } else if (policy === 'allowlist') {
+        const addrs = allowlist.split(/[\s,]+/).map(s => s.trim()).filter(Boolean)
+        if (addrs.length === 0) throw new Error('Add at least one approved recipient address.')
+        const { root, ordered } = await allowlistRoot(addrs) // throws on invalid address
+        policyCommitment = await allowlistCommitment(root, secret)
+        allowlistMembers = ordered
+        allowlistRootHex = bytesToHex(root)
+      } else {
+        throw new Error(`${POLICY_META[policy].label} vaults aren’t wired for spending yet — coming soon.`)
+      }
+
       const spentCommitment  = await deriveSpentCommitment(blinding, periodId)
       const vaultId          = await getVaultCount()
 
@@ -108,6 +127,10 @@ export function OpenVaultModal({
       sessionStorage.setItem(`vault_${vaultId}_policy_commitment`, policyCommitment)
       sessionStorage.setItem(`vault_${vaultId}_spent_commitment`,  spentCommitment)
       sessionStorage.setItem(`vault_${vaultId}_period_cap`,        capStroops.toString())
+      if (policy === 'allowlist' && allowlistMembers && allowlistRootHex) {
+        sessionStorage.setItem(`vault_${vaultId}_allowlist_root`,    allowlistRootHex)
+        sessionStorage.setItem(`vault_${vaultId}_allowlist_members`, JSON.stringify(allowlistMembers))
+      }
 
       const vault: VaultInfo = {
         id: vaultId, owner: publicKey, policyType: policy,
@@ -202,7 +225,27 @@ export function OpenVaultModal({
             initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
             className="space-y-5">
 
-            {policy === 'allowance' && (
+            {policy === 'allowlist' && (
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">
+                  Approved recipients
+                </label>
+                <textarea
+                  value={allowlist} disabled={busy} rows={4}
+                  onChange={e => setAllowlist(e.target.value)}
+                  placeholder={'GABC…\nGDEF…\none Stellar address per line'}
+                  className="w-full mono text-[12px] bg-surface border border-border rounded-xl resize-none
+                             px-4 py-3 text-tx placeholder:text-tx3
+                             focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/20
+                             disabled:opacity-50 transition-all"
+                />
+                <p className="text-[12px] text-tx3">
+                  Only these recipients can be paid. Committed as a private Merkle root — the addresses never appear on-chain.
+                </p>
+              </div>
+            )}
+
+            {(policy === 'allowance' || policy === 'allowlist') && (
               <div className="space-y-2">
                 <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">
                   Period cap (XLM)
@@ -218,7 +261,7 @@ export function OpenVaultModal({
                 <p className="text-[12px] text-tx3">
                   Stored as a private hash — the value never appears on-chain.
                 </p>
-                {previewHash && (
+                {policy === 'allowance' && previewHash && (
                   <div className="bg-surface rounded-xl border border-border px-3.5 py-2.5">
                     <p className="text-[10px] text-tx3 mb-1 font-semibold uppercase tracking-wide">
                       Commitment hash preview

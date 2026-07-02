@@ -37,6 +37,35 @@ export async function proveAllowance(req: AllowanceProveRequest): Promise<ProofR
   return res.json()
 }
 
+export interface AllowlistProveRequest {
+  vault_secret_hex: string
+  recipient_hex: string
+  set_root_hex: string
+  proof_hex: string[]
+  path_bits: boolean[]
+  spend_amount: number
+  prior_spent: number
+  period_cap: number
+  period_id: number
+  nullifier_secret_hex: string
+  blinding_hex: string
+  action_context_hex: string
+}
+
+export async function proveAllowlist(req: AllowlistProveRequest): Promise<ProofResponse> {
+  const res = await fetch(`${PROVER_URL}/prove/allowlist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    const m = typeof err.error === 'string' ? err.error : JSON.stringify(err.error)
+    throw new Error(m || `Proof generation failed (HTTP ${res.status})`)
+  }
+  return res.json()
+}
+
 export async function healthCheck(): Promise<boolean> {
   try {
     const res = await fetch(`${PROVER_URL}/health`, { signal: AbortSignal.timeout(3000) })

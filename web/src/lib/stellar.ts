@@ -5,6 +5,8 @@ import {
   Networks,
   BASE_FEE,
   Address,
+  Account,
+  Keypair,
   xdr,
   nativeToScVal,
 } from '@stellar/stellar-sdk'
@@ -178,13 +180,15 @@ export function buildSpendTx(p: SpendParams): Promise<string> {
 
 // ── view queries ──────────────────────────────────────────────────────────────
 
-const ANON = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN'
-
+// Read-only simulations don't need a funded/real source account — use a fresh
+// in-memory account with a valid strkey. (The previous hardcoded ANON address
+// was malformed (55 chars), so every view threw and silently returned 0 —
+// which mislabeled new vaults as #0 and misrouted deposits.)
 async function simView(contract: Contract, method: string, args: xdr.ScVal[]): Promise<xdr.ScVal> {
-  const account = await rpc.getAccount(ANON)
+  const account = new Account(Keypair.random().publicKey(), '0')
   const tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase })
     .addOperation(contract.call(method, ...args))
-    .setTimeout(10)
+    .setTimeout(30)
     .build()
   const sim = await rpc.simulateTransaction(tx)
   if (SorobanRpc.Api.isSimulationError(sim)) throw new Error(sim.error)
@@ -202,9 +206,10 @@ export async function getVaultBalance(vaultId: number): Promise<bigint> {
   } catch { return 0n }
 }
 
+// NOTE: no silent fallback — if this fails we must NOT proceed to open/deposit
+// with a bogus id (that misroutes funds). Let the caller surface the error.
 export async function getVaultCount(): Promise<number> {
-  try {
-    const val = await simView(vault, 'vault_count', [])
-    return val.switch().name === 'scvU32' ? val.u32() : 0
-  } catch { return 0 }
+  const val = await simView(vault, 'vault_count', [])
+  if (val.switch().name !== 'scvU32') throw new Error('vault_count returned unexpected type')
+  return val.u32()
 }

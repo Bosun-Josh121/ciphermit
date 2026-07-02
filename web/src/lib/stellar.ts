@@ -44,6 +44,10 @@ function bytesVal(hex: string): xdr.ScVal {
 const vault = new Contract(VAULT_CONTRACT_ID)
 const token = new Contract(TOKEN_CONTRACT_ID)
 
+// Inclusion fee well above the 100-stroop minimum so txs aren't deprioritised
+// on a busy testnet. The Soroban resource fee is added by assembleTransaction.
+const INCLUSION_FEE = '1000000' // 0.1 XLM
+
 async function buildTx(
   callerPubkey: string,
   contract: Contract,
@@ -51,9 +55,11 @@ async function buildTx(
   args: xdr.ScVal[],
 ): Promise<string> {
   const account = await rpc.getAccount(callerPubkey)
-  const tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase })
+  // 180s validity window: tolerant of wallet-popup delay before the tx is
+  // signed and broadcast (a short window makes txs expire = "timed out").
+  const tx = new TransactionBuilder(account, { fee: INCLUSION_FEE, networkPassphrase })
     .addOperation(contract.call(method, ...args))
-    .setTimeout(30)
+    .setTimeout(180)
     .build()
 
   const simResult = await rpc.simulateTransaction(tx)
@@ -64,13 +70,22 @@ async function buildTx(
 }
 
 async function pollUntilDone(hash: string): Promise<string> {
-  for (let i = 0; i < 30; i++) {
+  // ~120s of polling; tolerate transient RPC errors without aborting.
+  for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 2000))
-    const s = await rpc.getTransaction(hash)
-    if (s.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) return hash
-    if (s.status === SorobanRpc.Api.GetTransactionStatus.FAILED) throw new Error('Tx failed on-chain')
+    try {
+      const s = await rpc.getTransaction(hash)
+      if (s.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) return hash
+      if (s.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
+        throw new Error('Transaction failed on-chain')
+      }
+      // NOT_FOUND -> not yet included, keep polling
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('failed on-chain')) throw e
+      // transient RPC/network hiccup — keep polling
+    }
   }
-  throw new Error('Transaction timed out')
+  throw new Error(`Timed out waiting for confirmation. Check ${hash.slice(0, 8)}… on stellar.expert — it may still confirm.`)
 }
 
 export async function submitSigned(signedXdr: string): Promise<string> {
@@ -79,6 +94,7 @@ export async function submitSigned(signedXdr: string): Promise<string> {
   if (result.status === 'ERROR') {
     throw new Error(`Submit failed: ${result.errorResult?.toXDR('base64')}`)
   }
+  // TRY_AGAIN_LATER / PENDING / DUPLICATE all fall through to polling the hash.
   return pollUntilDone(result.hash)
 }
 

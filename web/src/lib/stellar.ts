@@ -124,12 +124,16 @@ export function buildOpenVaultTx(p: OpenVaultParams): Promise<string> {
   ])
 }
 
-export function buildTokenApproveTx(callerPubkey: string, amount: bigint): Promise<string> {
+export async function buildTokenApproveTx(callerPubkey: string, amount: bigint): Promise<string> {
+  // SEP-41 approve needs a live_until_ledger in the future. Derive it from the
+  // current ledger (a hardcoded value goes stale as the network advances).
+  const { sequence } = await rpc.getLatestLedger()
+  const liveUntil = sequence + 100_000 // ~6 days at 5s/ledger
   return buildTx(callerPubkey, token, 'approve', [
     addrVal(callerPubkey),
     addrVal(VAULT_CONTRACT_ID),
     i128Val(amount),
-    u32Val(500_000),
+    u32Val(liveUntil),
   ])
 }
 

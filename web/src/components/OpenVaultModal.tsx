@@ -14,7 +14,7 @@ import { useVaults } from '../lib/vaultsContext'
 import { useActivity } from '../lib/activityContext'
 import { POLICY_META } from '../lib/policyMeta'
 import { errMessage } from '../lib/format'
-import { allowlistRoot, allowlistCommitment, bytesToHex } from '../lib/merkle'
+import { allowlistRoot, allowlistCommitment, delegateSet, bytesToHex } from '../lib/merkle'
 import { NETWORK } from '../lib/config'
 import type { PolicyType, VaultInfo } from '../types/vault'
 import sha256 from '../lib/sha256'
@@ -55,6 +55,7 @@ export function OpenVaultModal({
   const [policy,      setPolicy]      = useState<PolicyType>('allowance')
   const [periodCap,   setPeriodCap]   = useState('')
   const [allowlist,   setAllowlist]   = useState('')
+  const [delegates,   setDelegates]   = useState('')
   const [deposit,     setDeposit]     = useState('')
   const [status,      setStatus]      = useState<Status>('idle')
   const [error,       setError]       = useState<string>()
@@ -91,6 +92,7 @@ export function OpenVaultModal({
       let policyCommitment: string
       let allowlistMembers: string[] | undefined
       let allowlistRootHex: string | undefined
+      let delegateRecords: { label: string; secret: string; cap: string }[] | undefined
       if (policy === 'allowance') {
         policyCommitment = await deriveCommitment(secret, capStroops, periodId)
       } else if (policy === 'allowlist') {
@@ -100,6 +102,18 @@ export function OpenVaultModal({
         policyCommitment = await allowlistCommitment(root, secret)
         allowlistMembers = ordered
         allowlistRootHex = bytesToHex(root)
+      } else if (policy === 'delegation') {
+        const parsed = delegates.split('\n').map(l => l.trim()).filter(Boolean).map((line, i) => {
+          const parts = line.split(',')
+          const cap = parseFloat(parts[parts.length - 1])
+          if (!cap || cap <= 0) throw new Error(`Line ${i + 1}: use "Label, cap" with a positive cap.`)
+          const label = parts.length > 1 ? parts.slice(0, -1).join(',').trim() : `Delegate ${i + 1}`
+          return { label, cap: BigInt(Math.round(cap * 1e7)).toString(), secret: randomHex32() }
+        })
+        if (parsed.length === 0) throw new Error('Add at least one delegate ("Label, cap").')
+        const { commitmentHex } = await delegateSet(parsed.map(d => d.secret), secret)
+        policyCommitment = commitmentHex
+        delegateRecords = parsed
       } else {
         throw new Error(`${POLICY_META[policy].label} vaults aren’t wired for spending yet — coming soon.`)
       }
@@ -130,6 +144,12 @@ export function OpenVaultModal({
       if (policy === 'allowlist' && allowlistMembers && allowlistRootHex) {
         sessionStorage.setItem(`vault_${vaultId}_allowlist_root`,    allowlistRootHex)
         sessionStorage.setItem(`vault_${vaultId}_allowlist_members`, JSON.stringify(allowlistMembers))
+      }
+      if (policy === 'delegation' && delegateRecords) {
+        sessionStorage.setItem(`vault_${vaultId}_delegates`, JSON.stringify(delegateRecords))
+      }
+      if (policy === 'delegation' && delegateRecords) {
+        sessionStorage.setItem(`vault_${vaultId}_delegates`, JSON.stringify(delegateRecords))
       }
 
       const vault: VaultInfo = {
@@ -241,6 +261,27 @@ export function OpenVaultModal({
                 />
                 <p className="text-[12px] text-tx3">
                   Only these recipients can be paid. Committed as a private Merkle root — the addresses never appear on-chain.
+                </p>
+              </div>
+            )}
+
+            {policy === 'delegation' && (
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">
+                  Delegates &amp; sub-caps
+                </label>
+                <textarea
+                  value={delegates} disabled={busy} rows={4}
+                  onChange={e => setDelegates(e.target.value)}
+                  placeholder={'Alice, 100\nBob, 50\none per line: Label, cap (XLM)'}
+                  className="w-full mono text-[12px] bg-surface border border-border rounded-xl resize-none
+                             px-4 py-3 text-tx placeholder:text-tx3
+                             focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/20
+                             disabled:opacity-50 transition-all"
+                />
+                <p className="text-[12px] text-tx3">
+                  Each delegate gets a private sub-budget. The set + caps are committed as a Merkle root — never on-chain.
+                  You (the owner) execute delegate spends.
                 </p>
               </div>
             )}

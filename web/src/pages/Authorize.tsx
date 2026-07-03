@@ -5,8 +5,8 @@ import { ChevronDown, Lock, ShieldCheck, Info, Check } from 'lucide-react'
 import { Panel, EmptyState } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
 import { AuthorizeReceipt } from '../components/AuthorizeReceipt'
-import { computeActionContext, proveAllowance, proveAllowlist, randomHex32, type ProofResponse } from '../lib/prover'
-import { allowlistMembershipProof } from '../lib/merkle'
+import { computeActionContext, proveAllowance, proveAllowlist, proveDelegation, randomHex32, type ProofResponse } from '../lib/prover'
+import { allowlistMembershipProof, delegateMembershipProof } from '../lib/merkle'
 import { buildSpendTx, submitSigned } from '../lib/stellar'
 import { signTransaction } from '../lib/wallet'
 import { useWallet } from '../lib/walletContext'
@@ -33,6 +33,12 @@ export function Authorize() {
   }, [vaults, vaultId])
 
   const vault = useMemo(() => vaults.find(v => v.id === vaultId) ?? null, [vaults, vaultId])
+  const delegateList = useMemo<{ label: string; secret: string; cap: string }[]>(
+    () => vault?.policyType === 'delegation'
+      ? JSON.parse(sessionStorage.getItem(`vault_${vault.id}_delegates`) ?? '[]') : [],
+    [vault],
+  )
+  const [delegateIdx, setDelegateIdx] = useState(0)
 
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount]       = useState('')
@@ -42,7 +48,7 @@ export function Authorize() {
   const [dropOpen, setDropOpen]   = useState(false)
 
   const busy = stage === 'building' || stage === 'verifying'
-  const supported = vault?.policyType === 'allowance' || vault?.policyType === 'allowlist' // wired prover paths
+  const supported = vault?.policyType === 'allowance' || vault?.policyType === 'allowlist' || vault?.policyType === 'delegation' // wired prover paths
   const canSubmit = !!vault && supported && recipient.trim().length > 0 && parseFloat(amount) > 0 && !busy
   const explorerUrl = txHash ? `https://stellar.expert/explorer/${NETWORK}/tx/${txHash}` : undefined
 
@@ -52,36 +58,56 @@ export function Authorize() {
     try {
       const stroops = BigInt(Math.round(parseFloat(amount) * 1e7))
       if (stroops <= 0n) throw new Error('Amount must be positive.')
-      const secret     = sessionStorage.getItem(`vault_${vault.id}_secret`) ?? randomHex32()
-      const periodCap  = BigInt(sessionStorage.getItem(`vault_${vault.id}_period_cap`) ?? '1000000000')
-      // running total already spent this period — makes the cap cumulative,
-      // not per-transaction. The proof enforces spend <= cap - priorSpent.
-      const priorSpent = BigInt(sessionStorage.getItem(`vault_${vault.id}_prior_spent`) ?? '0')
-      const remaining  = periodCap > priorSpent ? periodCap - priorSpent : 0n
-      if (stroops > remaining) {
-        throw new Error(`Spend exceeds the remaining period allowance — ${xlm(remaining)} XLM left this period.`)
-      }
+      const secret    = sessionStorage.getItem(`vault_${vault.id}_secret`) ?? randomHex32()
       const actionCtx = await computeActionContext(vault.owner, recipient, stroops)
+
       let proof: ProofResponse
-      if (vault.policyType === 'allowlist') {
-        const members: string[] = JSON.parse(sessionStorage.getItem(`vault_${vault.id}_allowlist_members`) ?? '[]')
-        const m = await allowlistMembershipProof(members, recipient) // throws if recipient not in the set
-        proof = await proveAllowlist({
-          vault_secret_hex: secret, recipient_hex: m.recipientHex, set_root_hex: m.setRootHex,
-          proof_hex: m.proofHex, path_bits: m.pathBits,
-          spend_amount: Number(stroops), prior_spent: Number(priorSpent),
-          period_cap: Number(periodCap), period_id: Number(vault.periodId),
-          nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(),
-          action_context_hex: actionCtx,
+      let spentKey: string   // where the running spent total lives
+      let priorValue: bigint
+
+      if (vault.policyType === 'delegation') {
+        const list: { label: string; secret: string; cap: string }[] =
+          JSON.parse(sessionStorage.getItem(`vault_${vault.id}_delegates`) ?? '[]')
+        const d = list[delegateIdx]
+        if (!d) throw new Error('Select a delegate for this spend.')
+        const cap  = BigInt(d.cap)
+        spentKey   = `vault_${vault.id}_deleg_${delegateIdx}_spent`
+        priorValue = BigInt(sessionStorage.getItem(spentKey) ?? '0')
+        const rem  = cap > priorValue ? cap - priorValue : 0n
+        if (stroops > rem) throw new Error(`Exceeds ${d.label}'s remaining sub-cap — ${xlm(rem)} XLM left.`)
+        const m = await delegateMembershipProof(list.map(x => x.secret), d.secret)
+        proof = await proveDelegation({
+          vault_secret_hex: secret, delegate_secret_hex: d.secret, delegate_pubkey_hex: m.delegatePubkeyHex,
+          merkle_proof_hex: m.proofHex, path_bits: m.pathBits,
+          spend_amount: Number(stroops), prior_delegate_spent: Number(priorValue), delegate_cap: Number(cap),
+          period_id: Number(vault.periodId),
+          nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(), action_context_hex: actionCtx,
         })
       } else {
-        proof = await proveAllowance({
-          vault_secret_hex: secret, spend_amount: Number(stroops), prior_spent: Number(priorSpent),
-          period_cap: Number(periodCap), period_id: Number(vault.periodId),
-          nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(),
-          action_context_hex: actionCtx,
-        })
+        const periodCap = BigInt(sessionStorage.getItem(`vault_${vault.id}_period_cap`) ?? '1000000000')
+        spentKey   = `vault_${vault.id}_prior_spent`
+        priorValue = BigInt(sessionStorage.getItem(spentKey) ?? '0')
+        const rem  = periodCap > priorValue ? periodCap - priorValue : 0n
+        if (stroops > rem) throw new Error(`Spend exceeds the remaining period allowance — ${xlm(rem)} XLM left this period.`)
+        if (vault.policyType === 'allowlist') {
+          const members: string[] = JSON.parse(sessionStorage.getItem(`vault_${vault.id}_allowlist_members`) ?? '[]')
+          const m = await allowlistMembershipProof(members, recipient) // throws if recipient not in the set
+          proof = await proveAllowlist({
+            vault_secret_hex: secret, recipient_hex: m.recipientHex, set_root_hex: m.setRootHex,
+            proof_hex: m.proofHex, path_bits: m.pathBits,
+            spend_amount: Number(stroops), prior_spent: Number(priorValue),
+            period_cap: Number(periodCap), period_id: Number(vault.periodId),
+            nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(), action_context_hex: actionCtx,
+          })
+        } else {
+          proof = await proveAllowance({
+            vault_secret_hex: secret, spend_amount: Number(stroops), prior_spent: Number(priorValue),
+            period_cap: Number(periodCap), period_id: Number(vault.periodId),
+            nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(), action_context_hex: actionCtx,
+          })
+        }
       }
+
       setStage('verifying')
       const hash = await submitSigned(await signTransaction(await buildSpendTx({
         vaultId: vault.id, owner: publicKey, to: recipient, amount: stroops,
@@ -91,7 +117,7 @@ export function Authorize() {
         nullifierHex: proof.nullifier, actionContextHex: proof.action_context,
       }), publicKey))
       sessionStorage.setItem(`vault_${vault.id}_spent_commitment`, proof.new_spent_commitment)
-      sessionStorage.setItem(`vault_${vault.id}_prior_spent`, (priorSpent + stroops).toString())
+      sessionStorage.setItem(spentKey, (priorValue + stroops).toString())
       updateVault(vault.id, { balance: vault.balance - stroops, spentCommitment: proof.new_spent_commitment })
       addActivity({ type: 'spend', vaultId: vault.id, amount: stroops, counterparty: recipient, txHash: hash })
       setTxHash(hash); setStage('authorized')
@@ -162,6 +188,26 @@ export function Authorize() {
             )}
           </div>
         </div>
+
+        {/* delegate selector (delegation vaults) */}
+        {vault?.policyType === 'delegation' && (
+          <div className="space-y-2">
+            <label className="block text-[11px] font-bold text-tx2 uppercase tracking-wide">Spend as delegate</label>
+            {delegateList.length === 0 ? (
+              <p className="text-[12px] text-tx3">No delegates recorded for this vault in this session.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {delegateList.map((d, i) => (
+                  <button key={i} type="button" disabled={busy} onClick={() => setDelegateIdx(i)}
+                    className={`text-[12px] font-medium px-3 py-2 rounded-lg border transition-colors
+                      ${i === delegateIdx ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-surface-2 border-border text-tx2 hover:text-tx hover:border-border-s'}`}>
+                    {d.label} · {xlm(BigInt(d.cap))} cap
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* recipient */}
         <div className="space-y-2">

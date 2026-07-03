@@ -12,6 +12,8 @@ import { StrKey } from '@stellar/stellar-sdk'
 
 const enc = new TextEncoder()
 const LEAF_PREFIX = enc.encode('allowlist-leaf')
+const DELEGATE_PUBKEY_PREFIX = enc.encode('delegate-pubkey')
+const DELEGATE_LEAF_PREFIX = enc.encode('delegate-leaf')
 
 export function hexToBytes(hex: string): Uint8Array {
   const clean = hex.replace(/^0x/, '')
@@ -88,6 +90,44 @@ export async function allowlistRoot(addresses: string[]): Promise<{ root: Uint8A
 /** The on-chain policy commitment for an allowlist vault: sha256(root || secret). */
 export async function allowlistCommitment(root: Uint8Array, vaultSecretHex: string): Promise<string> {
   return bytesToHex(await sha256(root, hexToBytes(vaultSecretHex)))
+}
+
+/* ── Delegation ─────────────────────────────────────────────────────────────
+   A delegate's identity is derived from a secret the owner issues:
+     pubkey = sha256("delegate-pubkey" || secret)
+     leaf   = sha256("delegate-leaf"   || pubkey)                              */
+
+export function delegatePubkey(secretHex: string): Promise<Uint8Array> {
+  return sha256(DELEGATE_PUBKEY_PREFIX, hexToBytes(secretHex))
+}
+
+async function delegateLeaf(secretHex: string): Promise<Uint8Array> {
+  return sha256(DELEGATE_LEAF_PREFIX, await delegatePubkey(secretHex))
+}
+
+/** Build the delegate-set root + commitment sha256(root || vault_secret). */
+export async function delegateSet(secretsHex: string[], vaultSecretHex: string):
+Promise<{ rootHex: string; commitmentHex: string; tree: MerkleTree }> {
+  if (secretsHex.length === 0) throw new Error('add at least one delegate')
+  const leaves = await Promise.all(secretsHex.map(delegateLeaf))
+  const tree = await buildMerkle(leaves)
+  const commitmentHex = bytesToHex(await sha256(tree.root, hexToBytes(vaultSecretHex)))
+  return { rootHex: bytesToHex(tree.root), commitmentHex, tree }
+}
+
+/** Membership proof for one delegate secret within the set. Throws if absent. */
+export async function delegateMembershipProof(secretsHex: string[], targetSecretHex: string):
+Promise<{ delegatePubkeyHex: string; proofHex: string[]; pathBits: boolean[] }> {
+  const idx = secretsHex.findIndex(s => s === targetSecretHex)
+  if (idx < 0) throw new Error('Delegate is not in this vault’s set.')
+  const leaves = await Promise.all(secretsHex.map(delegateLeaf))
+  const tree = await buildMerkle(leaves)
+  const { proof, pathBits } = merkleProof(tree, idx)
+  return {
+    delegatePubkeyHex: bytesToHex(await delegatePubkey(targetSecretHex)),
+    proofHex: proof.map(bytesToHex),
+    pathBits,
+  }
 }
 
 /** Membership proof for `recipient` against a stored member list. Throws if absent. */

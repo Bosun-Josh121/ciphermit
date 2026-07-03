@@ -33,11 +33,13 @@ export async function connectWallet(): Promise<string> {
   return address
 }
 
-/** Connects to a specific wallet directly (used by the connect cards). */
+/** Connects to a specific wallet directly (used by the connect cards).
+ *  fetchAddress() actively queries the wallet module (which triggers its
+ *  connect prompt); getAddress() only returns an already-cached address. */
 export async function connectWith(walletId: string): Promise<string> {
   ensureInit()
   StellarWalletsKit.setWallet(walletId)
-  const { address } = await StellarWalletsKit.getAddress()
+  const { address } = await StellarWalletsKit.fetchAddress()
   if (!address) throw new Error('No address returned by the wallet.')
   return address
 }

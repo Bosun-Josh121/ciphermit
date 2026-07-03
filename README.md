@@ -153,14 +153,73 @@ You should not have to take it on trust that real zero-knowledge is happening. A
 
 ## The application
 
-- **Overview**: total escrowed, active vaults, authorized spends, and recent activity.
-- **Vaults**: open, fund, and act on policy vaults. Opening a vault runs approve, `open_vault`, and `deposit`.
-- **Vault detail**: tabbed view with the policy summary, spend history, delegates, and the cryptographic config.
-- **Authorize**: the spend flow. Controls on the left, a live proof panel on the right with a progress timer, then the proof evidence.
-- **Delegates**: define and manage private, capped sub-budgets for a delegation vault.
-- **Audit**: view-key selective disclosure.
-- **Activity**: a full session ledger of every operation with real transaction links.
-- **Wallets**: Freighter, xBull, and Albedo. Albedo is web-based, so anyone can connect without installing an extension.
+The app is a full product with a persistent sidebar and several screens. This is a tour of every feature.
+
+### Onboarding and connect
+
+A landing walkthrough introduces the idea across a few screens (the problem, the three steps, a live proof demo, and a launch screen). The connect screen lists Freighter, xBull, and Albedo as cards. Click a card to connect that wallet directly, or use "choose from all wallets" for the full picker. Albedo is web-based, so anyone can connect without an extension. The sidebar shows the network, the connected address, and a disconnect control.
+
+### Overview (dashboard)
+
+Three summary tiles with count-up values (total escrowed, active vaults, authorized spends), then your vaults, then recent activity. Each section has an info affordance that explains what it is and why it matters.
+
+### Opening a vault
+
+A guided modal. First pick a policy, where each option shows how it works and a real-world use case. Then set the rule and fund it:
+
+- Allowance takes a period cap and a reset window (1 minute up to 30 days), and shows a live commitment-hash preview so you can watch the rule turn into a hash.
+- Allowlist takes the approved recipient addresses.
+- Delegation takes a delegate list, one private sub-cap each.
+
+Issuing runs three transactions in sequence: approve the token, `open_vault`, then `deposit`. A success screen links the transaction and takes you to the vault.
+
+### Vaults and vault cards
+
+Each vault is a card with its policy type, id, and escrow balance. A "limit private" marker sits where the hidden rule would be. Card actions are Authorize, Deposit, and Manage. When you have no vaults yet, a structured empty state shows a live call to action next to the four policy types, so the screen still explains itself.
+
+### Vault detail
+
+A full page with tabs:
+
+- Overview: the policy summary and quick actions.
+- Spends: this vault's spend history.
+- Delegates: for delegation vaults, the delegate list.
+- Settings: the cryptographic config (policy commitment, spent commitment, period, owner) with copy buttons, and a shortcut into Audit.
+
+### Authorize and the live proof receipt
+
+The spend screen. On the left you choose the vault, recipient, and amount. Delegation vaults add a delegate selector, and allowance vaults show a live "X XLM left this period, resets in ..." indicator. On the right is the live proof receipt, which is the signature moment of the app:
+
+- While proving, the private values blur behind a shimmer and a timer counts up with an estimate.
+- The stage text moves from "Proving privately" to "Submitting" to "Verifying on Stellar" to "Authorized".
+- On success the receipt turns to an accent border, a verified badge appears, the transaction hash types itself in, and a "View on Stellar" link opens the explorer.
+- A failure shows the real reason instead of a generic error.
+
+Right below the receipt sits the proof evidence panel described earlier (seal, image ID, journal digest, nullifier, commitment, plus the on-chain verifier link).
+
+### Deposits
+
+Add funds to any vault from a small modal. It runs approve then `deposit`, reads the fresh on-chain balance, and confirms with a transaction link. Deposits show up in Activity.
+
+### Delegates
+
+Grant a delegate a private, capped, revocable sub-budget from a vault. The grant derives a real sub-cap commitment on your device. The active delegates table shows each delegate (address truncated), the vault, the grant time, and a status chip, with a confirm step before a revoke.
+
+### Activity (the history ledger)
+
+A full-width ledger of everything done in the session, laid out as a table with columns for type, amount, recipient, vault, transaction, time, and status. Filter chips narrow the view by type (spends, deposits, opens, grants, revokes) or by a specific vault. Spends, deposits, and opens carry their real on-chain transaction hash and link to the explorer. Local-only actions are marked as such. Each spend also stores its proof, so it can be reopened in Audit later.
+
+### Receipts and evidence in one place
+
+Every spend produces two things you can point at: the animated receipt on the Authorize screen (recipient, amount, verified badge, transaction link) and the cryptographic proof panel (seal, image ID, journal digest, nullifier, commitment, and the on-chain verifier link). Both are kept in the activity record, so the receipt and the proof for a past spend can be reopened through the Audit reveal without regenerating anything.
+
+### Guidance and empty states
+
+Core features carry a clickable "how it works" affordance with a plain explanation and a use case. Empty screens show the real tool in a ready or disabled state (for example, the vault grid shape, or the audit tool with a "nothing to disclose yet" note) instead of a blank page.
+
+### Wallets
+
+Freighter, xBull, and Albedo are supported. Albedo is web-based, so anyone can connect without installing an extension. Keys never leave the browser, and on testnet a fresh account is funded through friendbot.
 
 ## Deployed contracts and verified transactions
 

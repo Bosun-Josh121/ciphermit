@@ -279,7 +279,7 @@ export function Authorize() {
         )}
 
         <Button fullWidth size="lg" loading={busy} disabled={!canSubmit} onClick={handleAuthorize}>
-          {busy ? 'Proving…' : 'Authorize transfer'}
+          {stage === 'building' ? 'Proving…' : stage === 'verifying' ? 'Submitting…' : 'Authorize transfer'}
         </Button>
       </Panel>
 
@@ -287,7 +287,7 @@ export function Authorize() {
       <div className="lg:sticky lg:top-6 space-y-3">
         <div className="flex items-center gap-2 text-[12px] text-tx3 px-1">
           <ShieldCheck size={13} className="text-accent" /> Live proof
-          <InfoTip text="Watch the spend get proven: the private values blur while a zero-knowledge proof is generated (~6 min on the demo prover), then verified on Stellar, then the signed receipt appears — all without exposing your rule." />
+          <InfoTip text="Watch the spend get proven: the private values blur while a zero-knowledge proof is generated (about 7 minutes on the demo prover). Then you sign, it is submitted and verified on Stellar, and the signed receipt appears, all without exposing your rule." />
         </div>
 
         {stage === 'idle' ? (

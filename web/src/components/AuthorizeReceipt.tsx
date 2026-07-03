@@ -121,7 +121,9 @@ export function AuthorizeReceipt({ stage, recipient, amount, txHash, explorerUrl
             </AnimatePresence>
 
             {isVeiled && (
-              <span className="mono text-[11px] text-tx3 shrink-0 tabular-nums">{mmss} · est. ~6 min</span>
+              <span className="mono text-[11px] text-tx3 shrink-0 tabular-nums">
+                {mmss}{stage === 'building' ? ' · est. ~7 min' : ' · submitting'}
+              </span>
             )}
           </div>
 

@@ -1,4 +1,5 @@
 import type { ReactNode, MouseEventHandler } from 'react'
+import { InfoTip } from './InfoTip'
 
 interface PanelProps {
   children: ReactNode
@@ -37,12 +38,15 @@ export function Panel({ children, className = '', glow, active, lift, onClick }:
 
 /* ── Section heading used across screens ── */
 export function SectionHead({
-  title, hint, action,
-}: { title: string; hint?: string; action?: ReactNode }) {
+  title, hint, action, info,
+}: { title: string; hint?: string; action?: ReactNode; info?: string }) {
   return (
     <div className="flex items-end justify-between gap-4 mb-4">
       <div>
-        <h2 className="text-[15px] font-extrabold text-tx tracking-tight">{title}</h2>
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-[15px] font-extrabold text-tx tracking-tight">{title}</h2>
+          {info && <InfoTip text={info} />}
+        </div>
         {hint && <p className="text-[12px] text-tx3 mt-0.5">{hint}</p>}
       </div>
       {action}

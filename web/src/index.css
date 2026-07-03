@@ -82,6 +82,7 @@ body {
    hairline border + layered soft shadow. Never a flat outline. */
 .panel {
   position: relative;
+  isolation: isolate;            /* contain the decorative pseudo-elements */
   background: var(--surface);
   border-radius: 16px;
   box-shadow: var(--shadow-card);
@@ -97,9 +98,8 @@ body {
   -webkit-mask-composite: xor;
           mask-composite: exclude;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;                   /* behind content, above the panel fill */
 }
-.panel > * { position: relative; z-index: 1; }
 
 /* faint internal top glow for feature/hero panels */
 .panel-glow::after {
@@ -109,7 +109,7 @@ body {
   border-radius: inherit;
   background: radial-gradient(ellipse 90% 60% at 50% -20%, rgba(46,230,197,0.07) 0%, transparent 70%);
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
 }
 
 /* selected/active surface — accent ring + glow */

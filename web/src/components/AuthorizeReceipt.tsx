@@ -28,6 +28,16 @@ export function AuthorizeReceipt({ stage, recipient, amount, txHash, explorerUrl
   const isAuthorized = stage === 'authorized'
   const isFailed     = stage === 'failed'
 
+  // elapsed timer during proving/verifying, for anticipation
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!isVeiled) { setElapsed(0); return }
+    const start = Date.now()
+    const iv = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000)
+    return () => clearInterval(iv)
+  }, [isVeiled])
+  const mmss = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
+
   const [typedHash, setTypedHash] = useState('')
   useEffect(() => {
     if (!isAuthorized || !txHash) { setTypedHash(''); return }
@@ -109,6 +119,10 @@ export function AuthorizeReceipt({ stage, recipient, amount, txHash, explorerUrl
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {isVeiled && (
+              <span className="mono text-[11px] text-tx3 shrink-0 tabular-nums">{mmss} · est. ~6 min</span>
+            )}
           </div>
 
           {/* Values — blurred when veiled */}

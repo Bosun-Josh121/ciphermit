@@ -40,7 +40,9 @@ export function Overview() {
 
       {/* ── Tier 2: your vaults ── */}
       <div>
-        <SectionHead title="Your vaults" hint={vaults.length ? `${vaults.length} active` : 'Open one to begin'}
+        <SectionHead title="Your vaults"
+          info="A vault escrows XLM and only releases it when a zero-knowledge proof shows the spend obeys your private rule — a spending cap, an approved-recipient list, or delegate sub-budgets. The rule stays off-chain; only commitments and proofs are published."
+          hint={vaults.length ? `${vaults.length} active` : 'Open one to begin'}
           action={vaults.length > 0 && (
             <button onClick={() => navigate('/app/vaults')} className="text-[12px] text-accent hover:underline">View all →</button>
           )} />

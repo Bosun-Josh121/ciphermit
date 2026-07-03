@@ -66,7 +66,9 @@ export function Delegates() {
       </AnimatePresence>
 
       <div className="space-y-4">
-        <SectionHead title="Active delegates" hint={`${active.length} active · sub-caps stay private`}
+        <SectionHead title="Active delegates"
+          info="Grant someone a private, capped, revocable spending allowance from a vault. Each delegate gets a hidden sub-budget; spends are proven within it without revealing the cap or the delegate list. Use-case: give a team member a monthly budget competitors can't see."
+          hint={`${active.length} active · sub-caps stay private`}
           action={!showForm && (
             <Button size="sm" variant="secondary" icon={<UserPlus size={13} />} onClick={() => setShowForm(true)}>
               Grant a delegate

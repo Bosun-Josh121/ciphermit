@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { ChevronDown, Lock, ShieldCheck, Info, Check } from 'lucide-react'
 import { Panel, EmptyState } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
+import { InfoTip } from '../components/ui/InfoTip'
 import { AuthorizeReceipt } from '../components/AuthorizeReceipt'
 import { computeActionContext, proveAllowance, proveAllowlist, proveDelegation, randomHex32, type ProofResponse } from '../lib/prover'
 import { allowlistMembershipProof, delegateMembershipProof } from '../lib/merkle'
@@ -153,7 +154,10 @@ export function Authorize() {
       {/* ── LEFT: controls ── */}
       <Panel className="p-6 space-y-6">
         <div>
-          <h2 className="text-[16px] font-extrabold text-tx">New transfer</h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-[16px] font-extrabold text-tx">New transfer</h2>
+            <InfoTip text="Pick a vault, a recipient, and an amount. Your device (with the prover) builds a zero-knowledge proof that the spend obeys the vault's hidden rule — then the contract verifies it and releases funds. The rule itself is never revealed." />
+          </div>
           <p className="text-[12px] text-tx2 mt-0.5">Funds release only after a valid zero-knowledge proof.</p>
         </div>
 
@@ -263,6 +267,7 @@ export function Authorize() {
       <div className="lg:sticky lg:top-6 space-y-3">
         <div className="flex items-center gap-2 text-[12px] text-tx3 px-1">
           <ShieldCheck size={13} className="text-accent" /> Live proof
+          <InfoTip text="Watch the spend get proven: the private values blur while a zero-knowledge proof is generated (~6 min on the demo prover), then verified on Stellar, then the signed receipt appears — all without exposing your rule." />
         </div>
 
         {stage === 'idle' ? (

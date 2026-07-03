@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ScanEye, ChevronDown, Check, KeyRound, Lock, ExternalLink, ShieldCheck } from 'lucide-react'
 import { Panel } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
+import { InfoTip } from '../components/ui/InfoTip'
 import { useHeaderAction } from '../components/AppShell'
 import { useVaults } from '../lib/vaultsContext'
 import { useActivity, type ActivityRecord } from '../lib/activityContext'
@@ -50,7 +51,10 @@ export function Audit() {
       {/* ── controls ── */}
       <Panel className="p-6 space-y-6">
         <div>
-          <h2 className="text-[16px] font-extrabold text-tx">Selective disclosure</h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-[16px] font-extrabold text-tx">Selective disclosure</h2>
+            <InfoTip text="Everything in a vault is private. When an auditor or accountant needs to verify one payment, the view key reveals just that single transaction's details — every other transaction stays hidden. Use-case: prove one payment was compliant without opening your whole book." />
+          </div>
           <p className="text-[12px] text-tx2 mt-0.5">Reveal exactly one transaction to an auditor — nothing else.</p>
         </div>
 

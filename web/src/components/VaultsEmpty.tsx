@@ -1,7 +1,8 @@
 import { Plus, Lock } from 'lucide-react'
 import { Panel } from './ui/Panel'
 import { Button } from './ui/Button'
-import { POLICY_META } from '../lib/policyMeta'
+import { InfoTip } from './ui/InfoTip'
+import { POLICY_META, POLICY_INFO } from '../lib/policyMeta'
 import type { PolicyType } from '../types/vault'
 
 const ORDER: PolicyType[] = ['allowance', 'delegation', 'compliance', 'allowlist']
@@ -42,7 +43,10 @@ export function VaultsEmptyHero({ onOpen }: { onOpen: () => void }) {
                     <meta.icon size={14} className="text-accent" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[13px] font-bold text-tx leading-tight">{meta.label}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[13px] font-bold text-tx leading-tight">{meta.label}</p>
+                      <InfoTip text={POLICY_INFO[type]} label="Info" />
+                    </div>
                     <p className="text-[11px] text-tx3 leading-snug mt-0.5">{meta.desc}</p>
                   </div>
                 </div>

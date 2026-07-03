@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, AlertCircle, ExternalLink, ChevronRight } from 'lucide-react'
+import { Check, AlertCircle, ExternalLink, ChevronRight, Info } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Modal } from './ui/Modal'
 import { Button } from './ui/Button'
@@ -12,7 +12,7 @@ import { randomHex32 } from '../lib/prover'
 import { useWallet } from '../lib/walletContext'
 import { useVaults } from '../lib/vaultsContext'
 import { useActivity } from '../lib/activityContext'
-import { POLICY_META } from '../lib/policyMeta'
+import { POLICY_META, POLICY_INFO } from '../lib/policyMeta'
 import { errMessage } from '../lib/format'
 import { allowlistRoot, allowlistCommitment, delegateSet, bytesToHex } from '../lib/merkle'
 import { NETWORK } from '../lib/config'
@@ -242,6 +242,12 @@ export function OpenVaultModal({
                 </button>
               )
             })}
+          </div>
+          <div className="flex items-start gap-2.5 bg-surface-2 border border-border rounded-xl px-4 py-3">
+            <Info size={14} className="text-accent mt-0.5 shrink-0" />
+            <p className="text-[12px] text-tx2 leading-relaxed">
+              <span className="font-bold text-tx">{POLICY_META[policy].label}:</span> {POLICY_INFO[policy]}
+            </p>
           </div>
           <Button fullWidth onClick={() => setStep(1)}>
             Continue with {POLICY_META[policy].label}

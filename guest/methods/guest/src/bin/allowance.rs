@@ -16,7 +16,7 @@
 //!                                precomputed by prover; vault recomputes to verify
 //!
 //! Public journal (committed in order, 128 bytes total):
-//!   policy_commitment:    [u8; 32]  sha256(period_cap || period_id || vault_secret)
+//!   policy_commitment:    [u8; 32]  sha256(period_cap || vault_secret)
 //!   new_spent_commitment: [u8; 32]  sha256(new_spent || period_id || blinding)
 //!   nullifier:            [u8; 32]  sha256(nullifier_secret || action_context)
 //!   action_context:       [u8; 32]  passed through; vault verifies it matches tx params
@@ -46,9 +46,11 @@ fn main() {
 
     let new_spent = prior_spent + spend_amount;
 
+    // policy commitment binds the cap to the vault secret but NOT the period,
+    // so the same vault's cap refills each period (period_id lives only in the
+    // per-period spent commitment below).
     let policy_commitment: [u8; 32] = Sha256::new()
         .chain_update(period_cap.to_le_bytes())
-        .chain_update(period_id.to_le_bytes())
         .chain_update(vault_secret)
         .finalize()
         .into();

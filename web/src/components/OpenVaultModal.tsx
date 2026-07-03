@@ -19,11 +19,12 @@ import { NETWORK } from '../lib/config'
 import type { PolicyType, VaultInfo } from '../types/vault'
 import sha256 from '../lib/sha256'
 
-async function deriveCommitment(secret: string, cap: bigint, period: bigint) {
-  const buf = new Uint8Array(48)
-  const v = new DataView(buf.buffer)
-  v.setBigUint64(0, cap, true); v.setBigUint64(8, period, true)
-  buf.set(Buffer.from(secret, 'hex'), 16)
+// sha256(period_cap_le || vault_secret) — period-independent, so the cap
+// refills each period (matches the updated allowance guest).
+async function deriveCommitment(secret: string, cap: bigint) {
+  const buf = new Uint8Array(40)
+  new DataView(buf.buffer).setBigUint64(0, cap, true)
+  buf.set(Buffer.from(secret, 'hex'), 8)
   return sha256(buf)
 }
 async function deriveSpentCommitment(blinding: string, period: bigint) {
@@ -35,6 +36,12 @@ async function deriveSpentCommitment(blinding: string, period: bigint) {
 }
 
 const POLICIES: PolicyType[] = ['allowance', 'delegation', 'compliance', 'allowlist']
+const PERIOD_PRESETS = [
+  { label: '1 min', secs: '60' },
+  { label: '1 hour', secs: '3600' },
+  { label: '1 day', secs: '86400' },
+  { label: '30 days', secs: '2592000' },
+]
 type Step   = 0 | 1 | 2
 type Status = 'idle' | 'approving' | 'opening' | 'depositing'
 
@@ -54,6 +61,7 @@ export function OpenVaultModal({
   const [step,        setStep]        = useState<Step>(0)
   const [policy,      setPolicy]      = useState<PolicyType>('allowance')
   const [periodCap,   setPeriodCap]   = useState('')
+  const [periodLen,   setPeriodLen]   = useState('86400') // cap-reset window, seconds (default 1 day)
   const [allowlist,   setAllowlist]   = useState('')
   const [delegates,   setDelegates]   = useState('')
   const [deposit,     setDeposit]     = useState('')
@@ -71,7 +79,7 @@ export function OpenVaultModal({
     if (!cap || cap <= 0) { setPreviewHash(undefined); return }
     let cancelled = false
     ;(async () => {
-      const h = await deriveCommitment('00'.repeat(32), BigInt(Math.round(cap * 1e7)), 1n)
+      const h = await deriveCommitment('00'.repeat(32), BigInt(Math.round(cap * 1e7)))
       if (!cancelled) setPreviewHash(h)
     })()
     return () => { cancelled = true }
@@ -94,7 +102,7 @@ export function OpenVaultModal({
       let allowlistRootHex: string | undefined
       let delegateRecords: { label: string; secret: string; cap: string }[] | undefined
       if (policy === 'allowance') {
-        policyCommitment = await deriveCommitment(secret, capStroops, periodId)
+        policyCommitment = await deriveCommitment(secret, capStroops)
       } else if (policy === 'allowlist') {
         const addrs = allowlist.split(/[\s,]+/).map(s => s.trim()).filter(Boolean)
         if (addrs.length === 0) throw new Error('Add at least one approved recipient address.')
@@ -141,6 +149,9 @@ export function OpenVaultModal({
       sessionStorage.setItem(`vault_${vaultId}_policy_commitment`, policyCommitment)
       sessionStorage.setItem(`vault_${vaultId}_spent_commitment`,  spentCommitment)
       sessionStorage.setItem(`vault_${vaultId}_period_cap`,        capStroops.toString())
+      if (policy === 'allowance') {
+        sessionStorage.setItem(`vault_${vaultId}_period_secs`, periodLen)
+      }
       if (policy === 'allowlist' && allowlistMembers && allowlistRootHex) {
         sessionStorage.setItem(`vault_${vaultId}_allowlist_root`,    allowlistRootHex)
         sessionStorage.setItem(`vault_${vaultId}_allowlist_members`, JSON.stringify(allowlistMembers))
@@ -302,6 +313,20 @@ export function OpenVaultModal({
                 <p className="text-[12px] text-tx3">
                   Stored as a private hash — the value never appears on-chain.
                 </p>
+                {policy === 'allowance' && (
+                  <div className="pt-1">
+                    <p className="text-[11px] text-tx3 mb-1.5">Cap resets every</p>
+                    <div className="flex flex-wrap gap-2">
+                      {PERIOD_PRESETS.map(p => (
+                        <button key={p.secs} type="button" disabled={busy} onClick={() => setPeriodLen(p.secs)}
+                          className={`text-[12px] font-medium px-3 py-1.5 rounded-lg border transition-colors
+                            ${periodLen === p.secs ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-surface-2 border-border text-tx2 hover:text-tx hover:border-border-s'}`}>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {policy === 'allowance' && previewHash && (
                   <div className="bg-surface rounded-xl border border-border px-3.5 py-2.5">
                     <p className="text-[10px] text-tx3 mb-1 font-semibold uppercase tracking-wide">

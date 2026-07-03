@@ -86,7 +86,16 @@ export function Authorize() {
         })
       } else {
         const periodCap = BigInt(sessionStorage.getItem(`vault_${vault.id}_period_cap`) ?? '1000000000')
-        spentKey   = `vault_${vault.id}_prior_spent`
+        // allowance caps roll on a timer: period_id = floor(now / period_length),
+        // and spent is tracked per period_id so the cap refills each window.
+        let periodId = vault.periodId
+        if (vault.policyType === 'allowance') {
+          const periodSecs = Number(sessionStorage.getItem(`vault_${vault.id}_period_secs`) ?? '31536000')
+          periodId = BigInt(Math.floor(Date.now() / 1000 / periodSecs))
+          spentKey = `vault_${vault.id}_period_${periodId}_spent`
+        } else {
+          spentKey = `vault_${vault.id}_prior_spent`
+        }
         priorValue = BigInt(sessionStorage.getItem(spentKey) ?? '0')
         const rem  = periodCap > priorValue ? periodCap - priorValue : 0n
         if (stroops > rem) throw new Error(`Spend exceeds the remaining period allowance — ${xlm(rem)} XLM left this period.`)
@@ -97,13 +106,13 @@ export function Authorize() {
             vault_secret_hex: secret, recipient_hex: m.recipientHex, set_root_hex: m.setRootHex,
             proof_hex: m.proofHex, path_bits: m.pathBits,
             spend_amount: Number(stroops), prior_spent: Number(priorValue),
-            period_cap: Number(periodCap), period_id: Number(vault.periodId),
+            period_cap: Number(periodCap), period_id: Number(periodId),
             nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(), action_context_hex: actionCtx,
           })
         } else {
           proof = await proveAllowance({
             vault_secret_hex: secret, spend_amount: Number(stroops), prior_spent: Number(priorValue),
-            period_cap: Number(periodCap), period_id: Number(vault.periodId),
+            period_cap: Number(periodCap), period_id: Number(periodId),
             nullifier_secret_hex: randomHex32(), blinding_hex: randomHex32(), action_context_hex: actionCtx,
           })
         }
@@ -239,6 +248,8 @@ export function Authorize() {
           </div>
         </div>
 
+        {vault?.policyType === 'allowance' && <PeriodHint vault={vault} />}
+
         {/* privacy / support note */}
         {supported ? (
           <div className="flex items-start gap-3 bg-accent/5 border border-accent/15 rounded-xl px-4 py-3">
@@ -253,7 +264,7 @@ export function Authorize() {
             <Info size={13} className="text-tx3 mt-0.5 shrink-0" />
             <p className="text-[12px] text-tx2 leading-relaxed">
               Live proving for the <span className="text-tx font-semibold">{POLICY_META[vault!.policyType].label}</span> policy
-              isn’t wired in this prototype build — the allowance circuit is the end-to-end demo path. Pick an allowance vault to authorize.
+              isn’t wired yet — coming soon. Allowance, Allowlist, and Delegation vaults are fully supported.
             </p>
           </div>
         )}
@@ -298,6 +309,28 @@ export function Authorize() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function PeriodHint({ vault }: { vault: VaultInfo }) {
+  const [, tick] = useState(0)
+  useEffect(() => { const iv = setInterval(() => tick(t => t + 1), 1000); return () => clearInterval(iv) }, [])
+  const periodSecs = Number(sessionStorage.getItem(`vault_${vault.id}_period_secs`) ?? '31536000')
+  const cap = BigInt(sessionStorage.getItem(`vault_${vault.id}_period_cap`) ?? '0')
+  const nowSec = Math.floor(Date.now() / 1000)
+  const periodId = Math.floor(nowSec / periodSecs)
+  const spent = BigInt(sessionStorage.getItem(`vault_${vault.id}_period_${periodId}_spent`) ?? '0')
+  const remaining = cap > spent ? cap - spent : 0n
+  const resetsIn = (periodId + 1) * periodSecs - nowSec
+  const fmt = (s: number) => {
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+    return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`
+  }
+  return (
+    <div className="flex items-center justify-between text-[12px] bg-surface-2 border border-border rounded-xl px-4 py-2.5">
+      <span className="text-tx2"><span className="mono font-bold text-tx">{xlm(remaining)}</span> XLM left this period</span>
+      <span className="text-tx3">resets in <span className="mono text-tx2">{fmt(resetsIn)}</span></span>
     </div>
   )
 }

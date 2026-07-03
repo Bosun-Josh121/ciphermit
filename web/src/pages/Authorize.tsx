@@ -15,6 +15,7 @@ import { useVaults } from '../lib/vaultsContext'
 import { useActivity } from '../lib/activityContext'
 import { POLICY_META } from '../lib/policyMeta'
 import { xlm, errMessage } from '../lib/format'
+import { ProofDetails } from '../components/ProofDetails'
 import { NETWORK } from '../lib/config'
 import type { ProofStage, VaultInfo } from '../types/vault'
 
@@ -47,6 +48,7 @@ export function Authorize() {
   const [txHash, setTxHash]       = useState<string>()
   const [errMsg, setErrMsg]       = useState<string>()
   const [dropOpen, setDropOpen]   = useState(false)
+  const [proofData, setProofData] = useState<ProofResponse>()
 
   const busy = stage === 'building' || stage === 'verifying'
   const supported = vault?.policyType === 'allowance' || vault?.policyType === 'allowlist' || vault?.policyType === 'delegation' // wired prover paths
@@ -118,6 +120,7 @@ export function Authorize() {
         }
       }
 
+      setProofData(proof)
       setStage('verifying')
       const hash = await submitSigned(await signTransaction(await buildSpendTx({
         vaultId: vault.id, owner: publicKey, to: recipient, amount: stroops,
@@ -129,7 +132,13 @@ export function Authorize() {
       sessionStorage.setItem(`vault_${vault.id}_spent_commitment`, proof.new_spent_commitment)
       sessionStorage.setItem(spentKey, (priorValue + stroops).toString())
       updateVault(vault.id, { balance: vault.balance - stroops, spentCommitment: proof.new_spent_commitment })
-      addActivity({ type: 'spend', vaultId: vault.id, amount: stroops, counterparty: recipient, txHash: hash })
+      addActivity({
+        type: 'spend', vaultId: vault.id, amount: stroops, counterparty: recipient, txHash: hash,
+        proof: {
+          seal: proof.seal, image_id: proof.image_id, journal_digest: proof.journal_digest,
+          nullifier: proof.nullifier, policy_commitment: proof.policy_commitment,
+        },
+      })
       setTxHash(hash); setStage('authorized')
     } catch (e: unknown) {
       console.error('Authorize failed:', e)
@@ -143,7 +152,7 @@ export function Authorize() {
     }
   }
 
-  function reset() { setStage('idle'); setTxHash(undefined); setErrMsg(undefined) }
+  function reset() { setStage('idle'); setTxHash(undefined); setErrMsg(undefined); setProofData(undefined) }
 
   if (vaults.length === 0) {
     return (
@@ -306,6 +315,9 @@ export function Authorize() {
               )}
               {busy && <p className="text-center text-[12px] text-tx3 font-medium">Watching the chain…</p>}
             </div>
+            {stage === 'authorized' && proofData && (
+              <div className="mt-3"><ProofDetails proof={proofData} txHash={txHash} /></div>
+            )}
           </div>
         )}
       </div>

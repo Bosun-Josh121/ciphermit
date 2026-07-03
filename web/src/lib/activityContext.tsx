@@ -16,6 +16,8 @@ export interface ActivityRecord {
   counterparty?: string  // recipient (spend) or delegate (grant/revoke)
   txHash?: string        // real on-chain hash, when the op hit the chain
   timestamp: number
+  // the ZK proof artifacts of a spend — kept so the proof can be inspected later
+  proof?: { seal: string; image_id: string; journal_digest: string; nullifier: string; policy_commitment: string }
 }
 
 interface ActivityState {

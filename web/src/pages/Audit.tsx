@@ -5,6 +5,7 @@ import { ScanEye, ChevronDown, Check, KeyRound, Lock, ExternalLink, ShieldCheck 
 import { Panel } from '../components/ui/Panel'
 import { Button } from '../components/ui/Button'
 import { InfoTip } from '../components/ui/InfoTip'
+import { ProofDetails } from '../components/ProofDetails'
 import { useHeaderAction } from '../components/AppShell'
 import { useVaults } from '../lib/vaultsContext'
 import { useActivity, type ActivityRecord } from '../lib/activityContext'
@@ -174,6 +175,9 @@ export function Audit() {
             )}
           </AnimatePresence>
         </Panel>
+        {revealed && rec?.proof && (
+          <div className="mt-3"><ProofDetails proof={rec.proof} txHash={rec.txHash} /></div>
+        )}
       </div>
     </div>
   )

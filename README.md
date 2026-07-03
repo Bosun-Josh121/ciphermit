@@ -23,7 +23,9 @@ Ciphermit is a spending vault on Stellar (Soroban) where your rules stay secret 
 11. [Tech stack](#tech-stack)
 12. [Repository layout](#repository-layout)
 13. [Local setup](#local-setup)
-14. [Honest scope and roadmap](#honest-scope-and-roadmap)
+14. [Testing notes](#testing-notes)
+15. [Known limitations](#known-limitations)
+16. [Roadmap](#roadmap)
 
 ## The problem
 
@@ -348,8 +350,25 @@ stellar contract build --package ciphermit-vault
 
 The image IDs must match the guest programs the prover is running. If you rebuild a guest, its image ID changes, so re-run `set-image-ids.sh` to keep the contract and the prover in sync.
 
-## Honest scope and roadmap
+## Testing notes
 
-- Three policies (allowance, allowlist, delegation) are fully wired and verified on-chain. Compliance is built at the guest and prover layer and is the next to wire through the UI.
-- Proving runs on a hosted prover service, so the strong and true claim is that policies never touch the chain. A production build would run the prover locally or in a trusted enclave, so the witness never leaves the user.
-- Next steps: bind the running spent total to on-chain state for fully trustless cumulative caps, persist activity beyond a session, and turn the view key into a cryptographic disclosure capability.
+A few things to keep in mind when trying the live app,
+
+- **Proofs take a few minutes.** A real RISC Zero Groth16 proof is heavy. On the current demo prover (an 8 GB machine) it takes about 7 minutes. The Authorize screen shows a proving state with a running timer, so a wait is normal, not a freeze. After the proof, signing and on-chain confirmation add up to about two more minutes.
+
+- **Test one spend at a time.** The demo prover is a single shared instance on a small machine. Two proofs running at once will slow both down, so run spends sequentially.
+- **State is session-scoped.** Vault secrets, view keys, and the activity log live in the browser session (session storage). If the session is cleared, a different browser is used, or the session expires, previously opened vaults cannot be spent from, because their secrets are gone. Open a fresh vault to continue.
+
+## Known limitations
+
+- **Compliance is not wired end to end yet.** Its guest program and prover endpoint exist, but the UI flow is the next piece to build.
+- **The prover is hosted, so private inputs are sent to it.** The guarantee that holds today is that policies never appear on-chain. Privacy from the prover itself would come from running the prover locally or inside a trusted enclave, so the witness never leaves the user. This is a deployment choice, not a protocol limitation.
+- **Cumulative caps are enforced for an honest client, not yet trustlessly.** The allowance cap and the delegate sub-caps are enforced by the proof for the inputs the app provides, and the running total is tracked per period in the browser. Binding that spent total to on-chain state, so a hand-crafted client cannot reset it, is a roadmap item.
+- **Rolling periods apply to newly opened allowance vaults.** Allowance vaults created before the rolling-period update use the older commitment scheme and will not carry over. Open a fresh allowance vault to use rolling caps.
+
+## Roadmap
+
+- Wire compliance through the UI, including the sorted-set deny-list and the accreditation path.
+- Bind the running spent total to on-chain state for fully trustless cumulative caps.
+- Move proving to a local or enclave prover so the witness never leaves the user.
+- Persist activity beyond a single session, and turn the view key into a full cryptographic disclosure capability.
